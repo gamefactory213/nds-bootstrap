@@ -78,8 +78,23 @@ void updateDescriptor(int slot, u32 sector) {
 	cacheCounter[slot] = accessCounter;
 }
 
+bool preftechInitialized = false;
+
+initializePreftech() {
+	int oldIME = enterCriticalSection();	
+	REG_IPC_SYNC |= IPC_SYNC_IRQ_ENABLE;
+	REG_IE |= IRQ_IPC_SYNC;
+
+	preftechInitialized = true;
+	leaveCriticalSection(oldIME);
+}
+
 void cardRead (u32* cacheStruct) {
 	//nocashMessage("\narm9 cardRead\n");	
+	
+	if(!preftechInitialized) {
+		initializePreftech();
+	}
 	
 	accessCounter++;
 	
@@ -226,7 +241,22 @@ void cardRead (u32* cacheStruct) {
 				accessCounter++;
 			}			
 		}
-	}	
+	}
+}
+
+//---------------------------------------------------------------------------------
+void myIrqHandlerFIFO(void) {
+//---------------------------------------------------------------------------------
+	#ifdef DEBUG		
+	nocashMessage("myIrqHandlerFIFO");
+	#endif	
+}
+
+
+void myIrqHandlerVBlank(void) {
+	#ifdef DEBUG		
+	nocashMessage("myIrqHandlerVBlank");
+	#endif	
 }
 
 

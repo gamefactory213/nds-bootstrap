@@ -137,9 +137,6 @@ int main(void) {
 	nocashMessage("sdmmc value received");
 	wordCommandAddr[1] = 0;
 	wordCommandAddr[0] = (vu32)0x027FEE08;
-
-	// fifoWaitValue32(FIFO_USER_03);
-	// fifoSendValue32(FIFO_USER_05, 1);	
 	
 	fifoSetValue32Handler(FIFO_USER_01,myFIFOValue32Handler,0);	
 

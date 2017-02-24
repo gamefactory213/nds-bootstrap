@@ -39,6 +39,44 @@ cacheStruct:
 
 card_engine_start:
 
+vblankHandler:
+@ Hook the return address, then go back to the original function
+	stmdb	sp!, {lr}
+	adr 	lr, code_handler_start_vblank
+	ldr 	r0,	intr_vblank_orig_return
+	bx  	r0
+
+fifoHandler:	
+@ Hook the return address, then go back to the original function
+	stmdb	sp!, {lr}
+	adr 	lr, code_handler_start_fifo
+	ldr 	r0,	intr_fifo_orig_return
+	bx  	r0
+	
+code_handler_start_vblank:
+	push	{r0-r12} 
+	ldr	r3, =myIrqHandlerVBlank
+	blx	r3		@ jump to myIrqHandler
+	
+	@ exit after return
+	b	exit
+	
+code_handler_start_fifo:
+	push	{r0-r12} 
+	ldr	r3, =myIrqHandlerFIFO
+	blx	r3		@ jump to myIrqHandler
+  
+  
+    @ exit after return
+	b	exit
+	
+exit:	
+	pop   	{r0-r12} 
+	pop  	{lr}
+	bx  lr
+
+.pool
+
 .global fastCopy32
 .type	fastCopy32 STT_FUNC
 @ r0 : src, r1 : dst, r2 : len
@@ -60,16 +98,16 @@ card_engine_end:
 
 .global readCachedRef
 patches:
+.word	vblankHandler
+.word	fifoHandler
 .word	card_read_arm9
 .word	card_pull_out_arm9
-.word	0x0
 .word	card_id_arm9
 .word	card_dma_arm9
 .word	cardStructArm9
 .word   card_pull
 .word   cacheFlushRef
 .word   readCachedRef
-.word   0x0
 .global needFlushDCCache
 needFlushDCCache:
 .word   0x0

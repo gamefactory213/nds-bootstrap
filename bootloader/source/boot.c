@@ -68,8 +68,6 @@ void sdmmc_controller_init();
 #define NDS_HEAD 0x02FFFE00
 #define TEMP_ARM9_START_ADDRESS (*(vu32*)0x02FFFFF4)
 
-#define CHEAT_ENGINE_LOCATION	0x027FE000
-#define CHEAT_DATA_LOCATION  	0x06010000
 #define ENGINE_LOCATION_ARM7  	0x03780000
 #define ENGINE_LOCATION_ARM9  	0x03700000
 
@@ -375,7 +373,7 @@ int main (void) {
 		u32 patchOffset = quickFind ((u8*)((u32*)NDS_HEAD)[0x0A], dldiMagicString, ((u32*)NDS_HEAD)[0x0B], sizeof(dldiMagicString));
 		u32* wordCommandAddr = (u32 *) (((u32)((u32*)NDS_HEAD)[0x0A])+patchOffset+0x80);
 		
-		int error = hookNdsHomebrew(NDS_HEAD, (const u32*)CHEAT_DATA_LOCATION, (u32*)CHEAT_ENGINE_LOCATION, (u32*)ENGINE_LOCATION_ARM7, wordCommandAddr);
+		int error = hookNdsHomebrew(NDS_HEAD, (u32*)ENGINE_LOCATION_ARM7, wordCommandAddr);
 		if(error == ERR_NONE) {
 			nocashMessage("dldi hook Sucessfull");
 		} else {
@@ -394,7 +392,7 @@ int main (void) {
 
 		patchCardNds(NDS_HEAD,ENGINE_LOCATION_ARM7,ENGINE_LOCATION_ARM9,params,saveFileCluster, patchMpuRegion, patchMpuSize, donorFile);
 		
-		int error = hookNdsRetail(NDS_HEAD, file, (const u32*)CHEAT_DATA_LOCATION, (u32*)CHEAT_ENGINE_LOCATION, (u32*)ENGINE_LOCATION_ARM7);
+		int error = hookNdsRetail(NDS_HEAD, file, (u32*)ENGINE_LOCATION_ARM7, (u32*)ENGINE_LOCATION_ARM9);
 			if(error == ERR_NONE) {
 			nocashMessage("card hook Sucessfull");
 		} else {

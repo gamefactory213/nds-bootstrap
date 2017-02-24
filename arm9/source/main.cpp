@@ -168,9 +168,6 @@ int main( int argc, char **argv) {
 		nocashMessage("fatInitDefault");
 		CIniFile bootstrapini( "sd:/_nds/nds-bootstrap.ini" );
 		
-		// fifoSendValue32(FIFO_USER_03, 1);
-		// fifoWaitValue32(FIFO_USER_05);
-
 		if(bootstrapini.GetInt("NDS-BOOTSTRAP","DEBUG",0) == 1) {	
 			debug=true;			
 			

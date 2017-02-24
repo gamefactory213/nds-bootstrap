@@ -106,121 +106,16 @@ loop_fastCopy32:
 card_engine_end:
 
 patches:
-.word	card_read_arm9
-.word	card_pull_out_arm9
-.word	card_irq_enable_arm7
 .word	vblankHandler
 .word	fifoHandler
-.word	cardStructArm9
+.word	card_irq_enable_arm7
 .word   card_pull
-.word   cacheFlushRef
-.word   readCachedRef
-.word   arm7Functions
+.word   arm7Functions	
 
 @---------------------------------------------------------------------------------
-card_read_arm9:
+card_pull:
 @---------------------------------------------------------------------------------
-    stmfd   sp!, {r0-r11,lr}
-	str 	r0, cacheRef
-	
-begin:	
-	@ registers used r0,r1,r2,r3,r5,r8,r11
-    ldr     r3,=0x4000100     @IPC_SYNC & command value
-    ldr     r8,=0x027FFB08    @shared area command			
-    ldr     r4, cardStructArm9	
-    ldr     r5, [R4]      @SRC
-	ldr     r1, [R4,#0x8] @LEN
-	ldr     r0, [R4,#0x4] @DST
-	mov     r2, #0x2400	
-	
-	@page computation
-	mov     r9, #0x200
-	rsb     r10, r9, #0
-	and     r11, r5, r10
-	
-	@ check for cmd2
-	cmp     r11, r5
-	bne     cmd1	
-	cmp     r1, #1024
-	blt     cmd1	
-	sub     r7, r8, #(0x027FFB08 - 0x026FFB08) @below dtcm
-	cmp     r0, r7
-	bgt     cmd1
-	sub     r7, r8, #(0x027FFB08 - 0x019FFB08) @above itcm
-	cmp     r0, r7
-	blt     cmd1
-	ands    r10, r0, #3
-	bne     cmd1
-	
-cmd2:
-	sub r7, r8, #(0x027FFB08 - 0x025FFB08) @cmd2 marker
-	@r0 dst, r1 len
-	ldr r9, cacheFlushRef
-	bx r9  			@ cache flush code
-	b 	send_cmd
-
-cmd1:	
-	mov     R1, #0x200
-	mov     r5, r11       @ current page	
-    sub     r7, r8, #(0x027FFB08 - 0x027ff800) @cmd1 marker
-
-send_cmd:
-	@dst, len, src, marker
-    stmia r8, {r0,r1,r5,r7}
-    
-    @sendIPCSync
-    strh    r2, [r3,#0x80]
-
-loop_wait:
-    ldr r9, [r8,#12]
-    cmp r9,#0
-    bne loop_wait	
-
-	@ check for cmd2
-	cmp     r1, #0x200
-	bne     exitfunc
-	
-	ldr 	r9, cacheRef
-	add     r9,r9,#0x20	@ cache buffer
-	mov     r10,r7	
-
-	@ copy 512 bytes
-	mov     r8, #512	
-loop_copy:
-	ldmia   r10!, {r0-r7}
-	stmia   r9!,  {r0-r7}
-	subs    r8, r8, #32  @ 4*8 bytes
-	bgt     loop_copy
-
-	ldr 	r0, cacheRef	
-	str     r11, [r0, #8]	@ cache page
-	
-	ldr r9, readCachedRef
-	bx r9  		
-	
-	cmp r0,#0	
-	bne begin
-
-exitfunc:	
-    ldmfd   sp!, {r0-r11,lr}
     bx      lr
-
-cardStructArm9:
-.word    0x00000000     
-cacheFlushRef:
-.word    0x00000000  
-readCachedRef:
-.word    0x00000000  
-cacheRef:
-.word    0x00000000  
-.pool
-@---------------------------------------------------------------------------------
-
-@---------------------------------------------------------------------------------
-card_pull_out_arm9:
-@---------------------------------------------------------------------------------
-	bx      lr
-@---------------------------------------------------------------------------------
 	
 @---------------------------------------------------------------------------------
 card_irq_enable_arm7:
@@ -237,10 +132,6 @@ _blx_r3_stub2:
 .pool
 @---------------------------------------------------------------------------------
 
-@---------------------------------------------------------------------------------
-card_pull:
-@---------------------------------------------------------------------------------
-	bx lr
 cacheFlush:
     stmfd   sp!, {r0-r11,lr}
 	

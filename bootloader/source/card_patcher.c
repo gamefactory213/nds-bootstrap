@@ -460,15 +460,13 @@ u32 patchCardNdsArm9 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, modu
 	
 	cardEngineLocation[3] = moduleParams->sdk_version;
 	
-	u32* cardReadPatch = (u32*) patches[0];
+	u32* cardReadPatch = (u32*) patches[2];
 
-	u32* cardPullOutPatch = patches[6];
+	u32* cardPullOutPatch = patches[7];
 	
-	u32* cardIdPatch = patches[3];
+	u32* cardIdPatch = patches[4];
 	
-	u32* cardDmaPatch = patches[4];
-	
-	debug[5] = patches;
+	u32* cardDmaPatch = patches[5];
 	
 	u32* card_struct = ((u32*)cardReadEndOffset) - 1;
 	//u32* cache_struct = ((u32*)cardIdStartOffset) - 1;
@@ -488,8 +486,8 @@ u32 patchCardNdsArm9 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, modu
 		*((u32*)patches[5]) = ((u32*)*card_struct)+7;	
 	}	
 	
-	*((u32*)patches[7]) = cardPullOutOffset+4;
-	*((u32*)patches[8]) = cardReadCachedOffset;
+	*((u32*)patches[8]) = cardPullOutOffset+4;
+	*((u32*)patches[9]) = cardReadCachedOffset;
 	patches[10] = needFlushCache;
 	
 	//copyLoop (oldArenaLow, cardReadPatch, 0xF0);	
@@ -664,7 +662,7 @@ u32 savePatchV2 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, module_pa
 	dbg_printf("\n");
 	
 	u32* patches =  (u32*) cardEngineLocation[0];
-	u32* arm7Function =  (u32*) patches[9];
+	u32* arm7Function =  (u32*) patches[4];
 	u32 srcAddr;
 	
 	u32* eepromProtect = (u32*) (JumpTableFunc + 0xE0);
@@ -950,7 +948,7 @@ u32 savePatchV1 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, module_pa
 	dbg_printf("\n");	
 	
 	u32* patches =  (u32*) cardEngineLocation[0];
-	u32* arm7Function =  (u32*) patches[9];
+	u32* arm7Function =  (u32*) patches[4];
 	
 	u32* eepromPageErase = (u32*) (JumpTableFunc + 0x10);
     dbg_printf("Eeprom page erase:\t");
@@ -1069,7 +1067,7 @@ u32 patchCardNdsArm7 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, modu
 	
 	u32* patches =  (u32*) cardEngineLocation[0];
 	u32* cardIrqEnablePatch = (u32*) patches[2];
-	u32* cardCheckPullOutPatch = (u32*) patches[1];
+	u32* cardCheckPullOutPatch = (u32*) patches[3];
 	
 	if(cardCheckPullOutOffset>0)
 		copyLoop ((u32*)cardCheckPullOutOffset, cardCheckPullOutPatch, 0x4);		
