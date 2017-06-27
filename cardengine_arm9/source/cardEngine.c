@@ -125,7 +125,7 @@ void processAsyncCommand() {
 		vu8* buffer = getCacheAddress(slot);
 		if(slot!=-1 && cacheCounter[slot] == 0xFFFFFFFF) {
 			// get back the data from arm7
-			if(sharedAddr[4] != (vu32)0) {
+			if(sharedAddr[4] == (vu32)0) {
 				// transfer back the WRAM-B cache to the arm9
 				transfertToArm9(slot);		
 				asyncSector = 0;
@@ -141,7 +141,7 @@ void getAsyncSector() {
 		vu8* buffer = getCacheAddress(slot);
 		if(slot!=-1 && cacheCounter[slot] == 0xFFFFFFFF) {
 			// get back the data from arm7
-			while(sharedAddr[1] != (vu32)0);
+			while(sharedAddr[4] != (vu32)0);
 			
 			// transfer back the WRAM-B cache to the arm9
 			transfertToArm9(slot);		
