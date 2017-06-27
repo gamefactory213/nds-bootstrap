@@ -65,7 +65,7 @@ void dopause() {
 	scanKeys();
 }
 
-void runFile(string filename, string savPath, string arm7DonorPath, u32 patchMpuRegion, u32 patchMpuSize) {
+void runFile(string filename, string savPath, string arm7DonorPath, u32 donorSdkVer, u32 patchMpuRegion, u32 patchMpuSize) {
 	vector<char*> argarray;
 	
 	if(debug) dopause();
@@ -98,7 +98,7 @@ void runFile(string filename, string savPath, string arm7DonorPath, u32 patchMpu
 		dbg_printf("no nds file specified\n");
 	} else {
 		dbg_printf("Running %s with %d parameters\n", argarray[0], argarray.size());
-		int err = runNdsFile (argarray[0], strdup(savPath.c_str()), strdup(arm7DonorPath.c_str()), patchMpuRegion, patchMpuSize, argarray.size(), (const char **)&argarray[0]);
+		int err = runNdsFile (argarray[0], strdup(savPath.c_str()), strdup(arm7DonorPath.c_str()), donorSdkVer, patchMpuRegion, patchMpuSize, argarray.size(), (const char **)&argarray[0]);
 		dbg_printf("Start failed. Error %i\n", err);
 
 	}
@@ -138,6 +138,14 @@ void myFIFOValue32Handler(u32 value,void* data)
 }
 
 
+bool isMounted;
+
+void InitSD(){
+	fatUnmount("sd:/");
+	__io_dsisd.shutdown();
+	isMounted = fatMountSimple("sd", &__io_dsisd);  
+}
+
 void initMBK() {
 	// default dsiware settings
 	
@@ -157,15 +165,31 @@ void initMBK() {
 	REG_MBK8=0x07803740;
 }
 
+int reinittimer = 0;
+bool run_reinittimer = true;
+//---------------------------------------------------------------------------------
+void VcountHandler() {
+//---------------------------------------------------------------------------------
+	if (run_reinittimer) {
+		reinittimer++;
+		if (reinittimer == 90) {
+			InitSD();	// Re-init SD if fatInit is looping
+		}
+	}
+}
+
 int main( int argc, char **argv) {	
+
+	irqSet(IRQ_VCOUNT, VcountHandler);
+
+	irqEnable( IRQ_VBLANK | IRQ_VCOUNT);
 
 	// switch to NTR mode
 	REG_SCFG_EXT = 0x83000000; // NAND/SD Access
-
-	initMBK();
 	
-	if (fatInitDefault()) {
-		nocashMessage("fatInitDefault");
+	InitSD();
+	if (isMounted) {
+		nocashMessage("isMounted");
 		CIniFile bootstrapini( "sd:/_nds/nds-bootstrap.ini" );
 		
 		if(bootstrapini.GetInt("NDS-BOOTSTRAP","DEBUG",0) == 1) {	
@@ -178,6 +202,35 @@ int main( int argc, char **argv) {
 			getSFCG_ARM9();
 			getSFCG_ARM7();		
 		}
+		
+		fatInitDefault();
+		nocashMessage("fatInitDefault");
+		run_reinittimer = false;
+
+		int romread_LED = bootstrapini.GetInt("NDS-BOOTSTRAP","ROMREAD_LED",1);
+		switch(romread_LED) {
+			case 0:
+			default:
+				break;
+			case 1:
+				dbg_printf("Using WiFi LED\n");
+				fifoSendValue32(FIFO_DSWIFI, 1);	// Set to use WiFi LED as card read indicator
+				break;
+			case 2:
+				dbg_printf("Using Power LED\n");
+				fifoSendValue32(FIFO_MAXMOD, 1);	// Set to use power LED (turn to purple) as card read indicator
+				break;
+			case 3:
+				dbg_printf("Using Camera LED\n");
+				fifoSendValue32(FIFO_USER_08, 1);	// Set to use Camera LED as card read indicator
+				break;
+		}
+
+		bool run_timeout = bootstrapini.GetInt( "NDS-BOOTSTRAP", "CHECK_COMPATIBILITY", 1);
+		if (run_timeout) fifoSendValue32(FIFO_USER_04, 1);
+
+		fifoSendValue32(FIFO_USER_03, 1);
+		fifoWaitValue32(FIFO_USER_05);
 		
 		if(bootstrapini.GetInt("NDS-BOOTSTRAP","LOGGING",0) == 1) {			
 			static FILE * debugFile;
@@ -199,7 +252,14 @@ int main( int argc, char **argv) {
 		
 		std::string	savPath = bootstrapini.GetString( "NDS-BOOTSTRAP", "SAV_PATH", "");	
 		
-		std::string	arm7DonorPath = bootstrapini.GetString( "NDS-BOOTSTRAP", "ARM7_DONOR_PATH", "");	
+		bool useArm7Donor = bootstrapini.GetInt( "NDS-BOOTSTRAP", "USE_ARM7_DONOR", 1);	
+
+		std::string	arm7DonorPath;	
+
+		if (useArm7Donor)
+			arm7DonorPath = bootstrapini.GetString( "NDS-BOOTSTRAP", "ARM7_DONOR_PATH", "");	
+		else
+			arm7DonorPath = "";
 		
 		u32	patchMpuRegion = bootstrapini.GetInt( "NDS-BOOTSTRAP", "PATCH_MPU_REGION", 0);	
 		
@@ -231,9 +291,12 @@ int main( int argc, char **argv) {
 		// Options from INI file set. Now tell Arm7 to check to apply changes if any were requested.
 		fifoSendValue32(FIFO_USER_06, 1);
 	
+		initMBK();
+
 		dbg_printf("Running %s\n", ndsPath.c_str());				
-		runFile(ndsPath.c_str(), savPath.c_str(), arm7DonorPath.c_str(), patchMpuRegion, patchMpuSize);	
+		runFile(ndsPath.c_str(), savPath.c_str(), arm7DonorPath.c_str(), bootstrapini.GetInt( "NDS-BOOTSTRAP", "DONOR_SDK_VER", 0), patchMpuRegion, patchMpuSize);	
 	} else {
+		run_reinittimer = false;
 		consoleDemoInit();
 		printf("SD init failed!\n");
 	}

@@ -41,6 +41,7 @@ void VcountHandler() {
 	inputGetAndSend();	
 }
 
+
 void myFIFOValue32Handler(u32 value,void* data)
 {
   nocashMessage("myFIFOValue32Handler");
@@ -105,7 +106,6 @@ int main(void) {
 //---------------------------------------------------------------------------------
 	// Switch to NTR Mode
 	REG_SCFG_ROM = 0x703;
-	REG_SCFG_EXT = 0x93A43000;
 	
 	// Find the DLDI reserved space in the file
 	u32 patchOffset = quickFind (__DSiHeader->ndshdr.arm9destination, dldiMagicString, __DSiHeader->ndshdr.arm9binarySize, sizeof(dldiMagicString));
@@ -130,6 +130,9 @@ int main(void) {
 
 	irqEnable( IRQ_VBLANK | IRQ_VCOUNT);
 	
+	i2cWriteRegister(0x4A, 0x12, 0x00);		// Press power-button for auto-reset
+	i2cWriteRegister(0x4A, 0x70, 0x01);		// Bootflag = Warmboot/SkipHealthSafety
+
 	nocashMessage("waiting dldi command");
 	//nocashMessage(tohex(wordCommandAddr));
 	// disable dldi sdmmc driver
@@ -137,6 +140,23 @@ int main(void) {
 	nocashMessage("sdmmc value received");
 	wordCommandAddr[1] = 0;
 	wordCommandAddr[0] = (vu32)0x027FEE08;
+
+	fifoWaitValue32(FIFO_USER_03);
+	//
+	if(fifoCheckValue32(FIFO_DSWIFI)) {
+		i2cWriteRegister(0x4A, 0x72, 0x01);		// Set to use WiFi LED as card read indicator
+		i2cWriteRegister(0x4A, 0x30, 0x12);    // Turn WiFi LED off
+	} else if(fifoCheckValue32(FIFO_MAXMOD)) {
+		i2cWriteRegister(0x4A, 0x72, 0x02);		// Set to use power LED (turn to purple) as card read indicator
+	} else if(fifoCheckValue32(FIFO_USER_08)) {
+		i2cWriteRegister(0x4A, 0x72, 0x03);		// Set to use Camera LED as card read indicator
+	}
+
+	if(fifoCheckValue32(FIFO_USER_04)) {
+		i2cWriteRegister(0x4A, 0x73, 0x01);		// Set to run comptibility check
+	}
+	//
+	fifoSendValue32(FIFO_USER_05, 1);	
 	
 	fifoSetValue32Handler(FIFO_USER_01,myFIFOValue32Handler,0);	
 
