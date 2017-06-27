@@ -19,6 +19,14 @@
 #ifndef CARD_ENGINE_ARM9_H
 #define CARD_ENGINE_ARM9_H
 
+#define READ_SIZE_ARM7 0x8000
+
+#define CACHE_ADRESS_START 0x03708000
+#define CACHE_ADRESS_SIZE 0x78000
+#define REG_MBK_CACHE_START	0x4004045
+#define REG_MBK_CACHE_SIZE	15
+#define PREFETCH_MARKER_SELECTED 0xffffffff
+
 #ifdef __cplusplus
 extern "C" {
 #endif
