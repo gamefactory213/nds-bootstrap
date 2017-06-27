@@ -80,42 +80,42 @@ void updateDescriptor(int slot, u32 sector) {
 }
 
 void triggerAsyncPrefetch(sector) {
-	
+	if(asyncSector == 0) {
+		int slot = getSlotForSector(sector);
+		vu8* buffer = getCacheAddress(slot);
+		// read max 32k via the WRAM cache
+		// do it only if there is no async command ongoing
+		if(slot==-1 && sharedAddr[4] == 0) {
+			// send a command to the arm7 to fill the WRAM cache
+			u32 commandRead = 0x020ff800;		
+			
+			slot = allocateCacheSlot();
+			
+			buffer = getCacheAddress(slot);
+			
+			if(needFlushDCCache) DC_FlushRange(buffer, READ_SIZE_ARM7);
+			
+			// transfer the WRAM-B cache to the arm7
+			transfertToArm7(slot);				
+			
+			// write the command
+			sharedAddr[0] = buffer;
+			sharedAddr[1] = READ_SIZE_ARM7;
+			sharedAddr[2] = sector;
+			sharedAddr[4] = commandRead;
+			
+			IPC_SendSync(0xEE24);	
+			
+			cacheDescriptor[slot] = sector;
+			cacheCounter[slot] = 0xFFFFFFFF ; // async marker
+			asyncSector = sector;
 
-	int slot = getSlotForSector(sector);
-	vu8* buffer = getCacheAddress(slot);
-	// read max 32k via the WRAM cache
-	// do it only if there is no async command ongoing
-	if(slot==-1 && sharedAddr[4] == 0) {
-		// send a command to the arm7 to fill the WRAM cache
-		u32 commandRead = 0x020ff800;		
-		
-		slot = allocateCacheSlot();
-		
-		buffer = getCacheAddress(slot);
-		
-		if(needFlushDCCache) DC_FlushRange(buffer, READ_SIZE_ARM7);
-		
-		// transfer the WRAM-B cache to the arm7
-		transfertToArm7(slot);				
-		
-		// write the command
-		sharedAddr[0] = buffer;
-		sharedAddr[1] = READ_SIZE_ARM7;
-		sharedAddr[2] = sector;
-		sharedAddr[4] = commandRead;
-		
-		IPC_SendSync(0xEE24);	
-		
-		cacheDescriptor[slot] = sector;
-		cacheCounter[slot] = 0xFFFFFFFF ; // async marker
-		asyncSector = sector;
-
-		// do it asynchronously
-		/*while(sharedAddr[4] != (vu32)0);	
-		
-		// transfer back the WRAM-B cache to the arm9
-		//transfertToArm9(slot);*/
+			// do it asynchronously
+			/*while(sharedAddr[4] != (vu32)0);	
+			
+			// transfer back the WRAM-B cache to the arm9
+			//transfertToArm9(slot);*/
+		}	
 	}	
 }
 
@@ -125,12 +125,27 @@ void processAsyncCommand() {
 		vu8* buffer = getCacheAddress(slot);
 		if(slot!=-1 && cacheCounter[slot] == 0xFFFFFFFF) {
 			// get back the data from arm7
-			while(sharedAddr[4] != (vu32)0);	
+			if(sharedAddr[4] != (vu32)0) {
+				// transfer back the WRAM-B cache to the arm9
+				transfertToArm9(slot);		
+				asyncSector = 0;
+				updateDescriptor(slot, asyncSector);
+			}			
+		}	
+	}	
+}
+
+void getAsyncSector() {
+	if(asyncSector != 0) {
+		int slot = getSlotForSector(asyncSector);
+		vu8* buffer = getCacheAddress(slot);
+		if(slot!=-1 && cacheCounter[slot] == 0xFFFFFFFF) {
+			// get back the data from arm7
+			while(sharedAddr[1] != (vu32)0);
 			
 			// transfer back the WRAM-B cache to the arm9
 			transfertToArm9(slot);		
 			asyncSector = 0;
-			updateDescriptor(slot, asyncSector);
 		}	
 	}	
 }
@@ -216,6 +231,7 @@ void cardRead (u32* cacheStruct) {
 				// transfer back the WRAM-B cache to the arm9
 				transfertToArm9(slot);				
 			}		
+			if(sector == asyncSector) getAsyncSector();
 
 			updateDescriptor(slot, sector);
 			
