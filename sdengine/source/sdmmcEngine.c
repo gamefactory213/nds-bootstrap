@@ -18,9 +18,9 @@
 
 #include <nds.h> 
 #include <nds/fifomessages.h>
+#include "sdmmc.h"
 #include "debugToFile.h"
 #include "fat.h"
-#include <nds/arm7/sdmmc.h>
 
 static bool initialized = false;
 extern volatile IntFn* volatile irqHandler; // this pointer is not at the end of the table but at the handler pointer corresponding to the current irq
@@ -51,18 +51,19 @@ void sdmmcCustomValueHandler(u32 value) {
         break;
 
     case SDMMC_SD_START:
-        //if (sdmmc_read16(REG_SDSTATUS0) == 0) {
-        //    result = 1;
-        //} else {
-            sdmmc_init_device();
-        //}
+        if (sdmmc_read16(REG_SDSTATUS0) == 0) {
+            result = 1;
+        } else {
+            sdmmc_controller_init();
+            result = sdmmc_sdcard_init();
+        }
 		//FAT_InitFiles(false);
 		//u32 myDebugFile = getBootFileCluster ("NDSBTSRP.LOG");
 		//enableDebug(myDebugFile);
         break;
 
     case SDMMC_SD_IS_INSERTED:
-        result = true;
+        result = sdmmc_cardinserted();
         break;
 
     case SDMMC_SD_STOP:
@@ -87,13 +88,13 @@ void sdmmcCustomMsgHandler(int bytes) {
 		dbg_printf("msg SDMMC_SD_READ_SECTORS received\n");
 //		siprintf(buf, "%X-%X-%X", msg.sdParams.startsector, msg.sdParams.numsectors, msg.sdParams.buffer);
 //		nocashMessage(buf);
-        retval = sdmmc_load_sectors(msg.sdParams.startsector, msg.sdParams.buffer, msg.sdParams.numsectors);
+        retval = sdmmc_sdcard_readsectors(msg.sdParams.startsector, msg.sdParams.numsectors, msg.sdParams.buffer);
         break;
     case SDMMC_SD_WRITE_SECTORS:
 		dbg_printf("msg SDMMC_SD_WRITE_SECTORS received\n");
 //		siprintf(buf, "%X-%X-%X", msg.sdParams.startsector, msg.sdParams.numsectors, msg.sdParams.buffer);
 //		nocashMessage(buf);
-        retval = sdmmc_write_sectors(msg.sdParams.startsector, msg.sdParams.buffer, msg.sdParams.numsectors);
+        retval = sdmmc_sdcard_writesectors(msg.sdParams.startsector, msg.sdParams.numsectors, msg.sdParams.buffer);
         break;
     }    
 

@@ -73,12 +73,10 @@ void runCardEngineCheck (void) {
 	nocashMessage("runCardEngineCheck");
 	#endif	
 	
-	if(tryLockMutex()) {		
-		#ifdef DEBUG		
-		nocashMessage("runCardEngineCheck mutex ok");
-		#endif	
-		
+	if(tryLockMutex()) {	
 		initLogging();
+		
+		//nocashMessage("runCardEngineCheck mutex ok");
 		
 		if(*(vu32*)(0x027FFB14) == (vu32)0x026ff800)
 		{			
@@ -147,13 +145,9 @@ void runCardEngineCheck (void) {
 			}			
 			#endif	
 	
-			*(vu32*)(0x027FFB14) = 0;
+			*(vu32*)(0x027FFB14) = 0;		
 		}
 		unlockMutex();
-		
-		/*for(int i=0; i<1000; i++);
-		// trigger the prefecth at arm9 level
-		IPC_SendSync(0xEE23);*/
 	}
 }
 

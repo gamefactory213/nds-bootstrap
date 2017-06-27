@@ -20,6 +20,13 @@
 #include <nds/fifomessages.h>
 #include "cardEngine.h"
 
+#define READ_SIZE_ARM7 0x8000
+
+#define CACHE_ADRESS_START 0x03708000
+#define CACHE_ADRESS_SIZE 0x78000
+#define REG_MBK_CACHE_START	0x4004045
+#define REG_MBK_CACHE_SIZE	15
+
 extern vu32* volatile cardStruct;
 //extern vu32* volatile cacheStruct;
 extern u32 sdk_version;
@@ -47,15 +54,15 @@ int allocateCacheSlot() {
 int getSlotForSector(u32 sector) {
 	for(int i=0; i<REG_MBK_CACHE_SIZE; i++) {
 		if(cacheDescriptor[i]==sector) {
-			if(cacheCounter[i]==PREFETCH_MARKER_SELECTED) return -2;
-			else return i;
+			return i;
 		}
 	}
 	return -1;
 }
 
+
 vu8* getCacheAddress(int slot) {
-	return (vu32*)(CACHE_ADRESS_START+slot*READ_SIZE_ARM7);
+	return (vu32*)(CACHE_ADRESS_START+slot*0x8000);
 }
 
 void transfertToArm7(int slot) {
@@ -66,16 +73,12 @@ void transfertToArm9(int slot) {
 	*((vu8*)(REG_MBK_CACHE_START+slot)) &= 0xFE;
 }
 
-void updateDescriptor(int slot, u32 sector, bool prefetch) {
+void updateDescriptor(int slot, u32 sector) {
 	cacheDescriptor[slot] = sector;
-	if(!prefetch)
-		cacheCounter[slot] = accessCounter;
-	else
-		cacheCounter[slot] = PREFETCH_MARKER_SELECTED;
+	cacheCounter[slot] = accessCounter;
 }
 
-static bool preftechInitialized = false;
-static int prefechSlot = 0;
+bool preftechInitialized = false;
 
 initializePreftech() {
 	int oldIME = enterCriticalSection();	
@@ -86,67 +89,12 @@ initializePreftech() {
 	leaveCriticalSection(oldIME);
 }
 
-void doPrefecth() {
-	#ifdef DEBUG		
-	nocashMessage("doPrefecth");
-	#endif	
-	if(tryLockMutex()) {	
-		if(prefechSlot!=0) {
-			u32 sector = cacheDescriptor[prefechSlot];
-			vu8* buffer = getCacheAddress(prefechSlot);
-			// send a command to the arm7 to fill the WRAM cache
-			u32 commandRead = 0x025FFB08;			
-
-			#ifdef DEBUG		
-				// send a log command for debug purpose
-				// -------------------------------------
-				commandRead = 0x026ff800;	
-				
-				sharedAddr[0] = buffer;
-				sharedAddr[1] = 9999;
-				sharedAddr[2] = sector;
-				sharedAddr[3] = commandRead;
-				
-				IPC_SendSync(0xEE24);
-				
-				while(sharedAddr[3] != (vu32)0);
-				// -------------------------------------*/
-			#endif	
-			
-			buffer = getCacheAddress(prefechSlot);
-			
-			if(needFlushDCCache) DC_FlushRange(buffer, READ_SIZE_ARM7);
-			
-			// transfer the WRAM-B cache to the arm7
-			transfertToArm7(prefechSlot);				
-			
-			// write the command
-			sharedAddr[0] = buffer;
-			sharedAddr[1] = READ_SIZE_ARM7;
-			sharedAddr[2] = sector;
-			sharedAddr[3] = commandRead;
-			
-			IPC_SendSync(0xEE24);	
-
-			while(sharedAddr[3] != (vu32)0);	
-			
-			// transfer back the WRAM-B cache to the arm9
-			transfertToArm9(prefechSlot);	
-
-			updateDescriptor(prefechSlot, sector, false);	
-
-			prefechSlot=0;			
-		}
-		unlockMutex();
-	}
-}
-
 void cardRead (u32* cacheStruct) {
 	//nocashMessage("\narm9 cardRead\n");	
 	
-	/*if(!preftechInitialized) {
+	if(!preftechInitialized) {
 		initializePreftech();
-	}*/
+	}
 	
 	accessCounter++;
 	
@@ -195,20 +143,13 @@ void cardRead (u32* cacheStruct) {
 		
 	} else {
 		// read via the WRAM cache
-		while(len > 0) {			
+		while(len > 0) {
 			int slot = getSlotForSector(sector);
 			vu8* buffer = getCacheAddress(slot);
-			if(slot==-2) {		
-				// marked for prefetch but not fully executed yet
-				doPrefecth(); // ensure that the prefetch is executed if not already ongoig
-				lockMutex(); // wait for prefetch to complete
-				unlockMutex();
-				
-			} else if(slot==-1) {		
-				// read max 32k via the WRAM cache	
-				//lockMutex(); // wait for prefetch to complete, if any
+			// read max 32k via the WRAM cache
+			if(slot==-1) {
 				// send a command to the arm7 to fill the WRAM cache
-				commandRead = 0x025FFB08;				
+				commandRead = 0x025FFB08;
 				
 				slot = allocateCacheSlot();
 				
@@ -230,23 +171,10 @@ void cardRead (u32* cacheStruct) {
 				while(sharedAddr[3] != (vu32)0);	
 				
 				// transfer back the WRAM-B cache to the arm9
-				transfertToArm9(slot);					
-				//unlockMutex();
-			}
+				transfertToArm9(slot);				
+			}		
 
-			// mark for prefetch the next sector unless some prefetch is already ongoing
-			/*if(tryLockMutex()) {				
-				int slotp = getSlotForSector(sector+READ_SIZE_ARM7);
-				if(slotp==-1) {
-					slotp = allocateCacheSlot();	
-					updateDescriptor(slotp, sector+READ_SIZE_ARM7, true );
-					prefechSlot = slotp;
-				}
-				unlockMutex();
-			}*/
-		
-			updateDescriptor(slot, sector, false);
-
+			updateDescriptor(slot, sector);
 			
 			u32 len2=len;
 			if((src - sector) + len2 > READ_SIZE_ARM7){
@@ -322,7 +250,6 @@ void myIrqHandlerFIFO(void) {
 	#ifdef DEBUG		
 	nocashMessage("myIrqHandlerFIFO");
 	#endif	
-	//doPrefecth();	
 }
 
 
@@ -330,7 +257,6 @@ void myIrqHandlerVBlank(void) {
 	#ifdef DEBUG		
 	nocashMessage("myIrqHandlerVBlank");
 	#endif	
-	//doPrefecth();
 }
 
 
