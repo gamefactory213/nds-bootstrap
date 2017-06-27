@@ -59,7 +59,8 @@ u32 cardReadCachedEndSignature4[4]   = {0xE5940024,0xE3500000,0x13A00001,0x03A00
    
 u32 cardReadDmaStartSignature[1]   = {0xE92D4FF8};
 u32 cardReadDmaStartSignatureAlt[1]   = {0xE92D47F0};
-u32 cardReadDmaEndSignature[3]   = {0x01FF8000,0x000001FF,0x027FFE60};     
+u32 cardReadDmaStartSignatureAlt2[1]   = {0xE92D4FF0};
+u32 cardReadDmaEndSignature[2]   = {0x01FF8000,0x000001FF};     
   
  
 
@@ -126,14 +127,36 @@ u32 generateA7Instr(int arg1, int arg2) {
     return (((u32)(arg2 - arg1 - 8) >> 2) & 0xFFFFFF) | 0xEB000000;
 }
 
-module_params_t* findModuleParams(const tNDSHeader* ndsHeader)
+module_params_t* findModuleParams(const tNDSHeader* ndsHeader, u32 donorSdkVer)
 {
 	dbg_printf("Looking for moduleparams\n");
 	uint32_t moduleparams = getOffset((u32*)ndsHeader->arm9destination, ndsHeader->arm9binarySize, (u32*)moduleParamsSignature, 2, 1);
 	if(!moduleparams)
 	{
 		dbg_printf("No moduleparams?\n");
-        return 0;
+		moduleparams = malloc(0x100);
+		memset(moduleparams,0,0x100);
+		((module_params_t*)(moduleparams - 0x1C))->compressed_static_end = 0;
+		switch(donorSdkVer) {
+			case 0:
+			default:
+				break;
+			case 1:
+				((module_params_t*)(moduleparams - 0x1C))->sdk_version = 0x1000500;
+				break;
+			case 2:
+				((module_params_t*)(moduleparams - 0x1C))->sdk_version = 0x2001000;
+				break;
+			case 3:
+				((module_params_t*)(moduleparams - 0x1C))->sdk_version = 0x3002001;
+				break;
+			case 4:
+				((module_params_t*)(moduleparams - 0x1C))->sdk_version = 0x4002001;
+				break;
+			case 5:
+				((module_params_t*)(moduleparams - 0x1C))->sdk_version = 0x5003001;
+				break;
+		}
 	}
 	return (module_params_t*)(moduleparams - 0x1C);
 }
@@ -298,8 +321,8 @@ u32 patchCardNdsArm9 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, modu
 	
 	u32 cardReadDmaOffset = 0;
 	u32 cardReadDmaEndOffset =  
-        getOffset(cardReadEndOffset, 0x00100000,//ndsHeader->arm9binarySize,
-              (u32*)cardReadDmaEndSignature, 3, 1);
+        getOffset((u32*)ndsHeader->arm9destination, 0x00300000,//ndsHeader->arm9binarySize,
+              (u32*)cardReadDmaEndSignature, 2, 1);
     if (!cardReadDmaEndOffset) {
         dbg_printf("Card read dma end not found\n");
     } else {
@@ -316,6 +339,15 @@ u32 patchCardNdsArm9 (const tNDSHeader* ndsHeader, u32* cardEngineLocation, modu
 					  (u32*)cardReadDmaStartSignatureAlt, 1, -1);			
 			if (!cardReadDmaOffset) {
 				dbg_printf("Card read dma start alt not found\n");
+			}
+		}		
+		if (!cardReadDmaOffset) {
+			//dbg_printf("Card read dma start not found\n");
+			cardReadDmaOffset =   
+				getOffset((u32*)cardReadDmaEndOffset, -0x200,
+					  (u32*)cardReadDmaStartSignatureAlt2, 1, -1);			
+			if (!cardReadDmaOffset) {
+				dbg_printf("Card read dma start alt2 not found\n");
 			}
 		}		
 	}    
