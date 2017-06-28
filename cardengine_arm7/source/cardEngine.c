@@ -204,9 +204,7 @@ void runCardEngineCheck (void) {
 			
 			timeoutRun = false;	// If card read received, do not show error screen
 
-			cardReadLED(true);    // When a file is loading, turn on LED for card read indicator
 			fileRead(dst,romFile,src,len);
-			cardReadLED(false);    // After loading is done, turn off LED for card read indicator
 			
 			#ifdef DEBUG		
 			dbg_printf("\nread \n");			
