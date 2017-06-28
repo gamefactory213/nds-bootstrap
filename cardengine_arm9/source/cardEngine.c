@@ -41,7 +41,7 @@ static u32 asyncSector = 0;
 
 int allocateCacheSlot() {
 	int slot = 0;
-	int lowerCounter = accessCounter;
+	u32 lowerCounter = accessCounter;
 	for(int i=0; i<REG_MBK_CACHE_SIZE; i++) {
 		if(cacheCounter[i]<=lowerCounter) {
 			lowerCounter = cacheCounter[i];
@@ -82,36 +82,36 @@ void updateDescriptor(int slot, u32 sector) {
 void triggerAsyncPrefetch(sector) {
 	if(asyncSector == 0) {
 		int slot = getSlotForSector(sector);
-		vu8* buffer = getCacheAddress(slot);
 		// read max 32k via the WRAM cache
 		// do it only if there is no async command ongoing
-		if(slot==-1 && sharedAddr[4] == 0) {
+		if(slot==-1) {
 			// send a command to the arm7 to fill the WRAM cache
 			u32 commandRead = 0x020ff800;		
 			
 			slot = allocateCacheSlot();
 			
-			buffer = getCacheAddress(slot);
+			vu8* buffer = getCacheAddress(slot);
 			
 			if(needFlushDCCache) DC_FlushRange(buffer, READ_SIZE_ARM7);
 			
 			// transfer the WRAM-B cache to the arm7
-			transfertToArm7(slot);				
+			transfertToArm7(slot);		
+
+			cacheDescriptor[slot] = sector;
+			cacheCounter[slot] = 0x0FFFFFFF ; // async marker
+			asyncSector = sector;		
 			
 			// write the command
 			sharedAddr[0] = buffer;
 			sharedAddr[1] = READ_SIZE_ARM7;
 			sharedAddr[2] = sector;
-			sharedAddr[4] = commandRead;
+			sharedAddr[3] = commandRead;
 			
-			IPC_SendSync(0xEE24);	
-			
-			cacheDescriptor[slot] = sector;
-			cacheCounter[slot] = 0xFFFFFFFF ; // async marker
-			asyncSector = sector;
+			IPC_SendSync(0xEE24);			
+
 
 			// do it asynchronously
-			/*while(sharedAddr[4] != (vu32)0);	
+			/*while(sharedAddr[3] != (vu32)0);	
 			
 			// transfer back the WRAM-B cache to the arm9
 			//transfertToArm9(slot);*/
@@ -122,14 +122,14 @@ void triggerAsyncPrefetch(sector) {
 void processAsyncCommand() {
 	if(asyncSector != 0) {
 		int slot = getSlotForSector(asyncSector);
-		vu8* buffer = getCacheAddress(slot);
-		if(slot!=-1 && cacheCounter[slot] == 0xFFFFFFFF) {
+		if(slot!=-1 && cacheCounter[slot] == 0x0FFFFFFF) {
 			// get back the data from arm7
-			if(sharedAddr[4] == (vu32)0) {
+			if(sharedAddr[3] == (vu32)0) {
 				// transfer back the WRAM-B cache to the arm9
 				transfertToArm9(slot);		
-				asyncSector = 0;
+				
 				updateDescriptor(slot, asyncSector);
+				asyncSector = 0;
 			}			
 		}	
 	}	
@@ -138,13 +138,14 @@ void processAsyncCommand() {
 void getAsyncSector() {
 	if(asyncSector != 0) {
 		int slot = getSlotForSector(asyncSector);
-		vu8* buffer = getCacheAddress(slot);
-		if(slot!=-1 && cacheCounter[slot] == 0xFFFFFFFF) {
+		if(slot!=-1 && cacheCounter[slot] == 0x0FFFFFFF) {
 			// get back the data from arm7
-			while(sharedAddr[4] != (vu32)0);
+			while(sharedAddr[3] != (vu32)0);
 			
 			// transfer back the WRAM-B cache to the arm9
 			transfertToArm9(slot);		
+			
+			updateDescriptor(slot, asyncSector);
 			asyncSector = 0;
 		}	
 	}	
@@ -181,9 +182,12 @@ void cardRead (u32* cacheStruct) {
 	while(sharedAddr[3] != (vu32)0);
 	// -------------------------------------*/
 	#endif
-
+	
+	processAsyncCommand();
 	
 	if(page == src && len > READ_SIZE_ARM7 && dst < 0x02700000 && dst > 0x02000000 && ((u32)dst)%4==0) {
+		getAsyncSector();
+		
 		// read directly at arm7 level
 		commandRead = 0x025FFB08;
 		
@@ -203,9 +207,10 @@ void cardRead (u32* cacheStruct) {
 		while(len > 0) {
 			int slot = getSlotForSector(sector);
 			vu8* buffer = getCacheAddress(slot);
-			processAsyncCommand();
 			// read max 32k via the WRAM cache
 			if(slot==-1) {
+				getAsyncSector();
+				
 				// send a command to the arm7 to fill the WRAM cache
 				commandRead = 0x025FFB08;
 				
@@ -229,14 +234,16 @@ void cardRead (u32* cacheStruct) {
 				while(sharedAddr[3] != (vu32)0);	
 				
 				// transfer back the WRAM-B cache to the arm9
-				transfertToArm9(slot);				
-			}		
-			if(sector == asyncSector) getAsyncSector();
-
-			updateDescriptor(slot, sector);
+				transfertToArm9(slot);		
+				updateDescriptor(slot, sector);
+				
+				u32 nextSector = sector+READ_SIZE_ARM7;		
+				triggerAsyncPrefetch(nextSector);		
+			} else {
+				if(cacheCounter[slot] == 0x0FFFFFFF) getAsyncSector();
+				updateDescriptor(slot, sector);
+			}
 			
-			u32 nextSector = ((src/READ_SIZE_ARM7)+1)*READ_SIZE_ARM7;			
-			triggerAsyncPrefetch(nextSector);
 			
 			u32 len2=len;
 			if((src - sector) + len2 > READ_SIZE_ARM7){
