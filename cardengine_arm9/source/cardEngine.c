@@ -240,7 +240,13 @@ void cardRead (u32* cacheStruct) {
 				u32 nextSector = sector+READ_SIZE_ARM7;		
 				triggerAsyncPrefetch(nextSector);		
 			} else {
-				if(cacheCounter[slot] == 0x0FFFFFFF) getAsyncSector();
+				if(cacheCounter[slot] == 0x0FFFFFFF) {
+					// prefetch successfull
+					getAsyncSector();
+					
+					u32 nextSector = sector+READ_SIZE_ARM7;		
+					triggerAsyncPrefetch(nextSector);	
+				}
 				updateDescriptor(slot, sector);
 			}
 			
