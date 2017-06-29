@@ -109,14 +109,13 @@ u32 popFromAsyncQueueHead() {
 	} else return 0;
 }
 
-void triggerAsyncPrefetch(sector) {
-	addToAsyncQueue(sector);
-	
+void triggerAsyncPrefetch(sector) {	
 	if(asyncSector == 0) {
 		int slot = getSlotForSector(sector);
 		// read max 32k via the WRAM cache
 		// do it only if there is no async command ongoing
 		if(slot==-1) {
+			addToAsyncQueue(sector);
 			// send a command to the arm7 to fill the WRAM cache
 			u32 commandRead = 0x020ff800;		
 			
