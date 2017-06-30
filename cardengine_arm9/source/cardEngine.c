@@ -20,12 +20,14 @@
 #include <nds/fifomessages.h>
 #include "cardEngine.h"
 
-#define READ_SIZE_ARM7 0x8000
+#define READ_SIZE_ARM7 0x1000
+#define SLOT_SIZE      0x8000
 
 #define CACHE_ADRESS_START 0x03708000
 #define CACHE_ADRESS_SIZE 0x78000
 #define REG_MBK_CACHE_START	0x4004045
-#define REG_MBK_CACHE_SIZE	15
+#define REG_MBK_SLOT_SIZE	15
+#define REG_MBK_CACHE_SIZE	120
 
 extern vu32* volatile cardStruct;
 //extern vu32* volatile cacheStruct;
@@ -68,15 +70,19 @@ int getSlotForSector(u32 sector) {
 
 
 vu8* getCacheAddress(int slot) {
-	return (vu32*)(CACHE_ADRESS_START+slot*0x8000);
+	return (vu32*)(CACHE_ADRESS_START+slot*READ_SIZE_ARM7);
 }
 
 void transfertToArm7(int slot) {
-	*((vu8*)(REG_MBK_CACHE_START+slot)) |= 0x1;
+	*((vu8*)(REG_MBK_CACHE_START+slot/8)) |= 0x1;
 }
 
 void transfertToArm9(int slot) {
-	*((vu8*)(REG_MBK_CACHE_START+slot)) &= 0xFE;
+	*((vu8*)(REG_MBK_CACHE_START+slot/8)) &= 0xFE;
+}
+
+bool isSlotAccessibleFromArm9(int slot) {
+	return (*((vu8*)(REG_MBK_CACHE_START+slot/8)) & 0x1 == 0);
 }
 
 void updateDescriptor(int slot, u32 sector) {
@@ -271,7 +277,7 @@ void cardRead (u32* cacheStruct) {
 	
 				triggerAsyncPrefetch(nextSector);		
 			} else {
-				if(cacheCounter[slot] == 0x0FFFFFFF) {
+				if(cacheCounter[slot] == 0x0FFFFFFF || !isSlotAccessibleFromArm9(slot)) {
 					// prefetch successfull
 					getAsyncSector();
 					
