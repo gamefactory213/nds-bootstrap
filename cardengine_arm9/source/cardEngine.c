@@ -41,20 +41,29 @@ static u32 cacheCounter [REG_MBK_CACHE_SIZE];
 static u32 accessCounter = 0;
 
 static u32 asyncSector = 0;
+static u32 currentSlot = 0;
 static u32 asyncQueue [5];
 static int aQHead = 0;
 static int aQTail = 0;
 static int aQSize = 0;
 
+bool isSlotAccessibleFromArm9(int slot) {
+	return (*((vu8*)(REG_MBK_CACHE_START+(slot/8))) & 0x1 == 0);
+}
+
 int allocateCacheSlot() {
 	int slot = 0;
 	u32 lowerCounter = accessCounter;
 	for(int i=0; i<REG_MBK_CACHE_SIZE; i++) {
-		if(cacheCounter[i]<=lowerCounter) {
-			lowerCounter = cacheCounter[i];
-			slot = i;
-			if(!lowerCounter) break;
-		}
+		if(currentSlot == i || !isSlotAccessibleFromArm9(i)) {			
+			i = (i/8) * 8 + 8 - 1;
+		} else {
+			if(cacheCounter[i]<=lowerCounter) {
+				lowerCounter = cacheCounter[i];
+				slot = i;
+				if(!lowerCounter) break;
+			}
+		}		
 	}
 	return slot;
 }
@@ -74,15 +83,11 @@ vu8* getCacheAddress(int slot) {
 }
 
 void transfertToArm7(int slot) {
-	*((vu8*)(REG_MBK_CACHE_START+slot/8)) |= 0x1;
+	*((vu8*)(REG_MBK_CACHE_START+(slot/8))) |= 0x1;
 }
 
 void transfertToArm9(int slot) {
-	*((vu8*)(REG_MBK_CACHE_START+slot/8)) &= 0xFE;
-}
-
-bool isSlotAccessibleFromArm9(int slot) {
-	return (*((vu8*)(REG_MBK_CACHE_START+slot/8)) & 0x1 == 0);
+	*((vu8*)(REG_MBK_CACHE_START+(slot/8))) &= 0xFE;
 }
 
 void updateDescriptor(int slot, u32 sector) {
@@ -245,6 +250,7 @@ void cardRead (u32* cacheStruct) {
 			int slot = getSlotForSector(sector);
 			vu8* buffer = getCacheAddress(slot);
 			u32 nextSector = sector+READ_SIZE_ARM7;	
+
 			// read max 32k via the WRAM cache
 			if(slot==-1) {
 				getAsyncSector();
@@ -253,6 +259,7 @@ void cardRead (u32* cacheStruct) {
 				commandRead = 0x025FFB08;
 				
 				slot = allocateCacheSlot();
+				currentSlot = slot;
 				
 				buffer = getCacheAddress(slot);
 				
@@ -277,6 +284,7 @@ void cardRead (u32* cacheStruct) {
 	
 				triggerAsyncPrefetch(nextSector);		
 			} else {
+				currentSlot = slot;
 				if(cacheCounter[slot] == 0x0FFFFFFF || !isSlotAccessibleFromArm9(slot)) {
 					// prefetch successfull
 					getAsyncSector();
