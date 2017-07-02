@@ -55,8 +55,9 @@ int allocateCacheSlot() {
 	int slot = 0;
 	u32 lowerCounter = accessCounter;
 	for(int i=0; i<REG_MBK_CACHE_SIZE; i++) {
-		if(currentSlot == i || !isSlotAccessibleFromArm9(i)) {			
+		if((currentSlot/8) == (i/8) || !isSlotAccessibleFromArm9(i)) {			
 			i = (i/8) * 8 + 8 - 1;
+			if(i>=REG_MBK_CACHE_SIZE) break;
 		} else {
 			if(cacheCounter[i]<=lowerCounter) {
 				lowerCounter = cacheCounter[i];
