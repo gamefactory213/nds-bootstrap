@@ -278,7 +278,7 @@ void NDSTouchscreenMode() {
 //---------------------------------------------------------------------------------
 int main(void) {
 //---------------------------------------------------------------------------------
-	// Switch to NTR Mode (doesn't work if arm7 SCFG is locked)
+	// Switch to NTR Mode
 	REG_SCFG_ROM = 0x703;
 	
 	// Find the DLDI reserved space in the file
@@ -342,7 +342,7 @@ int main(void) {
 	
 	// Keep the ARM7 mostly idle
 	while (1) {
-		// SCFGFifoCheck();	// ARM7 SCFG is locked on DSi
+		SCFGFifoCheck();
 		swiWaitForVBlank();
 	}
 }
