@@ -201,7 +201,7 @@ void getAsyncSector() {
 	}	
 }
 
-void cardRead (u32* cacheStruct) {
+int cardRead (u32* cacheStruct) {
 	//nocashMessage("\narm9 cardRead\n");	
 	
 	setExceptionHandler2();
@@ -380,6 +380,7 @@ void cardRead (u32* cacheStruct) {
 			}			
 		}
 	}	
+	return 0;
 }
 
 
