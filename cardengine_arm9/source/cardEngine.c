@@ -47,15 +47,18 @@ static int aQHead = 0;
 static int aQTail = 0;
 static int aQSize = 0;
 
-bool isSlotAccessibleFromArm9(int slot) {
-	return (*((vu8*)(REG_MBK_CACHE_START+(slot/8))) & 0x1 == 0);
-}
+void user_exception(void);
 
 //---------------------------------------------------------------------------------
 void setExceptionHandler2() {
 //---------------------------------------------------------------------------------
 	exceptionStack = (u32)0x23EFFFC ;
 	EXCEPTION_VECTOR = enterException ;
+	*exceptionC = user_exception;
+}
+
+bool isSlotAccessibleFromArm9(int slot) {
+	return (*((vu8*)(REG_MBK_CACHE_START+(slot/8))) & 0x1 == 0);
 }
 
 int allocateCacheSlot() {
