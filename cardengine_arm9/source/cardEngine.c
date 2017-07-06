@@ -132,7 +132,7 @@ u32 popFromAsyncQueueHead() {
 }
 
 void triggerAsyncPrefetch(sector) {	
-	if(asyncSector == 0) {
+	if(asyncSector == 0xFFFFFFFF) {
 		int slot = getSlotForSector(sector);
 		// read max 32k via the WRAM cache
 		// do it only if there is no async command ongoing
@@ -173,7 +173,7 @@ void triggerAsyncPrefetch(sector) {
 }
 
 void processAsyncCommand() {
-	if(asyncSector != 0) {
+	if(asyncSector != 0xFFFFFFFF) {
 		int slot = getSlotForSector(asyncSector);
 		if(slot!=-1 && cacheCounter[slot] == 0x0FFFFFFF) {
 			// get back the data from arm7
@@ -182,7 +182,7 @@ void processAsyncCommand() {
 				transfertToArm9(slot);		
 				
 				updateDescriptor(slot, asyncSector);
-				asyncSector = 0;
+				asyncSector = 0xFFFFFFFF;
 			}			
 		}	
 	}
