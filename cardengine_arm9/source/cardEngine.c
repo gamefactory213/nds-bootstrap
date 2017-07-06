@@ -189,7 +189,7 @@ void processAsyncCommand() {
 }
 
 void getAsyncSector() {
-	if(asyncSector != 0) {
+	if(asyncSector != 0xFFFFFFFF) {
 		int slot = getSlotForSector(asyncSector);
 		if(slot!=-1 && cacheCounter[slot] == 0x0FFFFFFF) {
 			// get back the data from arm7
@@ -199,7 +199,7 @@ void getAsyncSector() {
 			transfertToArm9(slot);		
 			
 			updateDescriptor(slot, asyncSector);
-			asyncSector = 0;
+			asyncSector = 0xFFFFFFFF;
 		}	
 	}	
 }
