@@ -24,7 +24,7 @@
 #include "fat.h"
 #include "i2c.h"
 
-#include "sr_data_twloader.h"	// For showing an error screen
+#include "sr_data_error.h"	// For showing an error screen
 
 static bool initialized = false;
 static bool initializedIRQ = false;
@@ -219,18 +219,12 @@ void runCardEngineCheck (void) {
 	}
 	REG_MASTER_VOLUME = volLevel;
 	
-	if ( 0 == (REG_KEYINPUT & (KEY_L | KEY_R | KEY_A | KEY_B | KEY_X | KEY_Y))) {
-		memcpy((u32*)0x02000000,sr_data_twloader,0x560);
-		i2cWriteRegister(0x4a,0x70,0x01);
-		i2cWriteRegister(0x4a,0x11,0x01);
-	}
-
 	if (timeoutRun) {
 		u8 setting = i2cReadRegister(0x4A, 0x73);
 		if (setting == 0x01) {
 			timeoutTimer += 1;
 			if (timeoutTimer == 60*2) {
-				memcpy((u32*)0x02000000,sr_data_twloader,0x560);
+				memcpy((u32*)0x02000000,sr_data_error,0x560);
 				i2cWriteRegister(0x4a,0x70,0x01);
 				i2cWriteRegister(0x4a,0x11,0x01);	// If on white screen for a while, the game is incompatible, so show an error screen
 			}
