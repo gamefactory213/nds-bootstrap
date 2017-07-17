@@ -22,9 +22,9 @@ SPECS		:=  specs
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=  -mthumb-interwork -march=armv4t
+ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-g -Wall -O2\
+CFLAGS	:=	-g -Wall -Os\
 			-mcpu=arm7tdmi -mtune=arm7tdmi -fomit-frame-pointer\
 			-ffast-math \
 			$(ARCH)
@@ -32,7 +32,7 @@ CFLAGS	:=	-g -Wall -O2\
 CFLAGS	+=	$(INCLUDE) -DARM7 -std=gnu99
 
 ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-nostartfiles -T $(TOPDIR)/load.ld -g $(ARCH) -Wl,--nmagic -Wl,-Map,$(TARGET).map
+LDFLAGS	=	-nostartfiles -T $(TOPDIR)/load.ld -g $(ARCH) -Wl,-Map,$(TARGET).map
 
 LIBS	:= 
 
@@ -112,20 +112,15 @@ $(LOADELF)	:	$(OFILES)
 	@$(LD)  $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
 	
 	
+sdengine.bin.o : sdengine.bin
+
+sdengine.bin:
+	cp $(CURDIR)/../../data/sdengine.bin sdengine.bin
+	
 dldiengine.bin.o : dldiengine.bin
 
 dldiengine.bin:
 	cp $(CURDIR)/../../data/dldiengine.bin dldiengine.bin
-	
-cardengine_arm7.bin.o : cardengine_arm7.bin
-
-cardengine_arm7.bin:
-	cp $(CURDIR)/../../data/cardengine_arm7.bin cardengine_arm7.bin
-	
-cardengine_arm9.bin.o : cardengine_arm9.bin
-
-cardengine_arm9.bin:
-	cp $(CURDIR)/../../data/cardengine_arm9.bin cardengine_arm9.bin
 
 -include $(DEPENDS)
 

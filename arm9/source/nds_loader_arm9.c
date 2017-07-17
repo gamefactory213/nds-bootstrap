@@ -29,6 +29,10 @@
 
 #include "load_bin.h"
 
+#ifndef _NO_BOOTSTUB_
+#include "bootstub_bin.h"
+#endif
+
 #include "nds_loader_arm9.h"
 #define LCDC_BANK_C (u16*)0x06840000
 #define STORED_FILE_CLUSTER (*(((u32*)LCDC_BANK_C) + 1))
@@ -63,11 +67,6 @@ dsiSD:
 #define ARG_SIZE_OFFSET 20
 #define HAVE_DSISD_OFFSET 28
 #define SAV_OFFSET 32
-#define DONOR_OFFSET 36
-#define USEDONOR_OFFSET 40
-#define DONORSDK_OFFSET 44
-#define PUR_OFFSET 48
-#define PUS_OFFSET 52
 
 typedef signed int addr_t;
 typedef unsigned char data_t;
@@ -267,7 +266,7 @@ static bool dldiPatchLoader (data_t *binData, u32 binSize, bool clearBSS)
 	return true;
 }
 
-int runNds (const void* loader, u32 loaderSize, u32 cluster, u32 saveCluster, u32 donorCluster, u32 useArm7Donor, u32 donorSdkVer, u32 patchMpuRegion, u32 patchMpuSize, bool initDisc, bool dldiPatchNds, int argc, const char** argv)
+int runNds (const void* loader, u32 loaderSize, u32 cluster, bool initDisc, bool dldiPatchNds, int argc, const char** argv)
 {
 	char* argStart;
 	u16* argData;
@@ -290,6 +289,11 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, u32 saveCluster, u3
 	writeAddr ((data_t*) LCDC_BANK_C, STORED_FILE_CLUSTER_OFFSET, cluster);
 	// INIT_DISC = initDisc;
 	writeAddr ((data_t*) LCDC_BANK_C, INIT_DISC_OFFSET, initDisc);
+
+	if(argv[0][0]=='s' && argv[0][1]=='d') {
+		dldiPatchNds = false;
+		writeAddr ((data_t*) LCDC_BANK_C, HAVE_DSISD_OFFSET, 1);
+	}
 
 	// WANT_TO_PATCH_DLDI = dldiPatchNds;
 	writeAddr ((data_t*) LCDC_BANK_C, WANT_TO_PATCH_DLDI_OFFSET, dldiPatchNds);
@@ -326,13 +330,6 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, u32 saveCluster, u3
 	
 	writeAddr ((data_t*) LCDC_BANK_C, ARG_START_OFFSET, (addr_t)argStart - (addr_t)LCDC_BANK_C);
 	writeAddr ((data_t*) LCDC_BANK_C, ARG_SIZE_OFFSET, argSize);
-	
-	writeAddr ((data_t*) LCDC_BANK_C, SAV_OFFSET, saveCluster);
-	writeAddr ((data_t*) LCDC_BANK_C, DONOR_OFFSET, donorCluster);
-	writeAddr ((data_t*) LCDC_BANK_C, USEDONOR_OFFSET, useArm7Donor);
-	writeAddr ((data_t*) LCDC_BANK_C, DONORSDK_OFFSET, donorSdkVer);
-	writeAddr ((data_t*) LCDC_BANK_C, PUR_OFFSET, patchMpuRegion);
-	writeAddr ((data_t*) LCDC_BANK_C, PUS_OFFSET, patchMpuSize);
 		
 	if(dldiPatchNds) {
 		// Patch the loader with a DLDI for the card
@@ -350,7 +347,7 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, u32 saveCluster, u3
 	nocashMessage("Give the VRAM to the ARM7");
 	// Give the VRAM to the ARM7
 	VRAM_C_CR = VRAM_ENABLE | VRAM_C_ARM7_0x06000000;	
-	VRAM_D_CR = VRAM_ENABLE | VRAM_D_ARM7_0x06020000;		
+	VRAM_D_CR = VRAM_ENABLE | VRAM_D_ARM7_0x06020000;	
 	
 	nocashMessage("Reset into a passme loop");
 	// Reset into a passme loop
@@ -362,20 +359,16 @@ int runNds (const void* loader, u32 loaderSize, u32 cluster, u32 saveCluster, u3
 	
 	nocashMessage("resetARM7");
 
-	resetARM7(0x06000000);	
-
+	resetARM7(0x06000000);
+	
 	nocashMessage("swiSoftReset");
 
 	swiSoftReset(); 
 	return true;
 }
 
-int runNdsFile (const char* filename, const char* savename, const char* arm7DonorPath, int useArm7Donor, int donorSdkVer, int patchMpuRegion, int patchMpuSize, int argc, const char** argv)  {
+int runNdsFile (const char* filename, int argc, const char** argv)  {
 	struct stat st;
-	struct stat stSav;
-	struct stat stDonor;
-	u32 clusterSav = 0;
-	u32 clusterDonor = 0;
 	char filePath[PATH_MAX];
 	int pathLen;
 	const char* args[1];
@@ -383,14 +376,6 @@ int runNdsFile (const char* filename, const char* savename, const char* arm7Dono
 	
 	if (stat (filename, &st) < 0) {
 		return 1;
-	}
-	
-	if (stat (savename, &stSav) >= 0) {
-		clusterSav = stSav.st_ino;
-	}
-	
-	if (stat (arm7DonorPath, &stDonor) >= 0) {
-		clusterDonor = stDonor.st_ino;
 	}
 
 	if (argc <= 0 || !argv) {
@@ -407,7 +392,59 @@ int runNdsFile (const char* filename, const char* savename, const char* arm7Dono
 	bool havedsiSD = false;
 
 	if(argv[0][0]=='s' && argv[0][1]=='d') havedsiSD = true;
+	
+	//installBootStub(havedsiSD);
 
-	return runNds (load_bin, load_bin_size, st.st_ino, clusterSav, clusterDonor, useArm7Donor, donorSdkVer, patchMpuRegion, patchMpuSize, true, true, argc, argv);
+	return runNds (load_bin, load_bin_size, st.st_ino, true, true, argc, argv);
+}
+
+/*
+	b	startUp
+	
+storedFileCluster:
+	.word	0x0FFFFFFF		@ default BOOT.NDS
+initDisc:
+	.word	0x00000001		@ init the disc by default
+wantToPatchDLDI:
+	.word	0x00000001		@ by default patch the DLDI section of the loaded NDS
+@ Used for passing arguments to the loaded app
+argStart:
+	.word	_end - _start
+argSize:
+	.word	0x00000000
+dldiOffset:
+	.word	_dldi_start - _start
+dsiSD:
+	.word	0
+*/
+bool installBootStub(bool havedsiSD) {
+#ifndef _NO_BOOTSTUB_
+	nocashMessage("installBootStub");
+	extern char *fake_heap_end;
+	struct __bootstub *bootcode = (struct __bootstub *)fake_heap_end;
+
+	memcpy(fake_heap_end,bootstub_bin,bootstub_bin_size);
+	memcpy(fake_heap_end+bootstub_bin_size,load_bin,load_bin_size);
+	bool ret = false;
+
+	if( havedsiSD) {
+		ret = true;
+		u32 *bootcode = (u32*)(fake_heap_end+bootstub_bin_size);
+		bootcode[3] = 0; // don't dldi patch
+		bootcode[7] = 1; // use internal dsi SD code
+	} else {
+		ret = dldiPatchLoader((data_t*)(fake_heap_end+bootstub_bin_size), load_bin_size,false);
+	}
+	bootcode->arm9reboot = (VoidFn)(((u32)bootcode->arm9reboot)+fake_heap_end); 
+	bootcode->arm7reboot = (VoidFn)(((u32)bootcode->arm7reboot)+fake_heap_end); 
+	bootcode->bootsize = load_bin_size;
+	
+	DC_FlushAll();
+
+	return ret;
+#else
+	return true;
+#endif
+
 }
 

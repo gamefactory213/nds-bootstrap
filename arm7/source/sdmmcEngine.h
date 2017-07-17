@@ -16,21 +16,19 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef DEBUG_TO_FILE_H
-#define DEBUG_TO_FILE_H
-
-#include "fat.h"
+#ifndef SDMMC_ENGINE_ARM7_H
+#define SDMMC_ENGINE_ARM7_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-u32 dbg_printf( char * message);
-u32 dbg_hexa(u32 n);
-void enableDebug(aFile debugFileCluster);
+
+void runSdMmcEngineCheck (vu32* commandAddr);
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // DEBUG_TO_FILE_H
+#endif // SDMMC_ENGINE_ARM7_H

@@ -34,20 +34,67 @@ cardStruct:
 	.word	0x00000000
 cacheStruct:
 	.word	0x00000000
-
+	
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
 card_engine_start:
+
+vblankHandler:
+@ Hook the return address, then go back to the original function
+	stmdb	sp!, {lr}
+	adr 	lr, code_handler_start_vblank
+	ldr 	r0,	intr_vblank_orig_return
+	bx  	r0
+
+fifoHandler:	
+@ Hook the return address, then go back to the original function
+	stmdb	sp!, {lr}
+	adr 	lr, code_handler_start_fifo
+	ldr 	r0,	intr_fifo_orig_return
+	bx  	r0
+	
+code_handler_start_vblank:
+	push	{r0-r12} 
+	ldr	r3, =myIrqHandlerVBlank
+	bl	_blx_r3_stub		@ jump to myIrqHandler
+	
+	@ exit after return
+	b	exit
+	
+code_handler_start_fifo:
+	push	{r0-r12} 
+	ldr	r3, =myIrqHandlerFIFO
+	bl	_blx_r3_stub		@ jump to myIrqHandler
+  
+  
+    @ exit after return
+	b	exit
+	
+@---------------------------------------------------------------------------------
+_blx_r3_stub:
+@---------------------------------------------------------------------------------
+	bx	r3	
+	
+@---------------------------------------------------------------------------------
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+exit:	
+	pop   	{r0-r12} 
+	pop  	{lr}
+	bx  lr
+
+.pool
 
 .global fastCopy32
 .type	fastCopy32 STT_FUNC
 @ r0 : src, r1 : dst, r2 : len
 fastCopy32:
     stmfd   sp!, {r3-r11,lr}
-	@ copy r2 bytes
-	mov     r10, r0
-	mov     r9, r1
-	mov     r8, r2
+	@ copy 512 bytes
+	mov     r10, r0	
+	mov     r9, r1	
+	mov     r8, r2	
 loop_fastCopy32:
 	ldmia   r10!, {r0-r7}
 	stmia   r9!,  {r0-r7}
@@ -58,47 +105,106 @@ loop_fastCopy32:
 
 card_engine_end:
 
-.global readCachedRef
 patches:
 .word	card_read_arm9
 .word	card_pull_out_arm9
-.word	0x0
-.word	card_id_arm9
-.word	card_dma_arm9
+.word	card_irq_enable_arm7
+.word	vblankHandler
+.word	fifoHandler
 .word	cardStructArm9
 .word   card_pull
 .word   cacheFlushRef
 .word   readCachedRef
-.word   0x0
-.global needFlushDCCache
-needFlushDCCache:
-.word   0x0
+.word   arm7Functions
 
 @---------------------------------------------------------------------------------
 card_read_arm9:
 @---------------------------------------------------------------------------------
-    stmfd   sp!, {r4-r11,lr}
+    stmfd   sp!, {r0-r11,lr}
+	str 	r0, cacheRef
+	
+begin:	
+	@ registers used r0,r1,r2,r3,r5,r8,r11
+    ldr     r3,=0x4000100     @IPC_SYNC & command value
+    ldr     r8,=0x027FFB08    @shared area command			
+    ldr     r4, cardStructArm9	
+    ldr     r5, [R4]      @SRC
+	ldr     r1, [R4,#0x8] @LEN
+	ldr     r0, [R4,#0x4] @DST
+	mov     r2, #0x2400	
+	
+	@page computation
+	mov     r9, #0x200
+	rsb     r10, r9, #0
+	and     r11, r5, r10
+	
+	@ check for cmd2
+	cmp     r11, r5
+	bne     cmd1	
+	cmp     r1, #1024
+	blt     cmd1	
+	sub     r7, r8, #(0x027FFB08 - 0x026FFB08) @below dtcm
+	cmp     r0, r7
+	bgt     cmd1
+	sub     r7, r8, #(0x027FFB08 - 0x019FFB08) @above itcm
+	cmp     r0, r7
+	blt     cmd1
+	ands    r10, r0, #3
+	bne     cmd1
+	
+cmd2:
+	sub r7, r8, #(0x027FFB08 - 0x025FFB08) @cmd2 marker
+	@r0 dst, r1 len
+	ldr r9, cacheFlushRef
+	blx r9  			@ cache flush code
+	b 	send_cmd
 
-	@ get back the WRAM C to arm9    
-	ldr     R3,=0x4004000 
-	MOV     R2, #0xFFFFFF80
-	STRB    R2, [R3,#0x44]
+cmd1:	
+	mov     R1, #0x200
+	mov     r5, r11       @ current page	
+    sub     r7, r8, #(0x027FFB08 - 0x027ff800) @cmd1 marker
 
-	ldr		r3, =cardRead
+send_cmd:
+	@dst, len, src, marker
+    stmia r8, {r0,r1,r5,r7}
+    
+    @sendIPCSync
+    strh    r2, [r3,#0x80]
 
-	@ldr     r1, =0xE92D4FF0
-@wait_for_wram_card_read:
-	@ldr     r2, [r3]
-	@cmp     r1, r2
-	@bne     wait_for_wram_card_read
+loop_wait:
+    ldr r9, [r8,#12]
+    cmp r9,#0
+    bne loop_wait	
 
-	bl		_blx_r3_stub_card_read
+	@ check for cmd2
+	cmp     r1, #0x200
+	bne     exitfunc
+	
+	ldr 	r9, cacheRef
+	add     r9,r9,#0x20	@ cache buffer
+	mov     r10,r7	
 
-    ldmfd   sp!, {r4-r11,lr}
+	@ copy 512 bytes
+	mov     r8, #512	
+loop_copy:
+	ldmia   r10!, {r0-r7}
+	stmia   r9!,  {r0-r7}
+	subs    r8, r8, #32  @ 4*8 bytes
+	bgt     loop_copy
+
+	ldr 	r0, cacheRef	
+	str     r11, [r0, #8]	@ cache page
+	
+	ldr r9, readCachedRef
+	blx r9  		
+	
+	cmp r0,#0	
+	bne begin
+
+exitfunc:	
+    ldmfd   sp!, {r0-r11,lr}
     bx      lr
-_blx_r3_stub_card_read:
-	bx	r3
-.pool
+
 cardStructArm9:
 .word    0x00000000     
 cacheFlushRef:
@@ -107,20 +213,7 @@ readCachedRef:
 .word    0x00000000  
 cacheRef:
 .word    0x00000000  
-@---------------------------------------------------------------------------------
-
-@---------------------------------------------------------------------------------
-card_id_arm9:
-@---------------------------------------------------------------------------------
-    mov r0, #1
-	bx      lr
-@---------------------------------------------------------------------------------
-
-@---------------------------------------------------------------------------------
-card_dma_arm9:
-@---------------------------------------------------------------------------------
-    mov r0, #0
-	bx      lr
+.pool
 @---------------------------------------------------------------------------------
 
 @---------------------------------------------------------------------------------
@@ -128,29 +221,42 @@ card_pull_out_arm9:
 @---------------------------------------------------------------------------------
 	bx      lr
 @---------------------------------------------------------------------------------
+	
+@---------------------------------------------------------------------------------
+card_irq_enable_arm7:
+@---------------------------------------------------------------------------------
+    push    {lr}
+	push	{r1-r12}
+	ldr	r3, =myIrqEnable
+	bl	_blx_r3_stub2
+	pop   	{r1-r12} 
+	pop  	{lr}
+	bx  lr
+_blx_r3_stub2:
+	bx	r3		
+.pool
+@---------------------------------------------------------------------------------
 
 @---------------------------------------------------------------------------------
 card_pull:
 @---------------------------------------------------------------------------------
-    bx      lr
-.global cacheFlush
-.type	cacheFlush STT_FUNC
+	bx lr
 cacheFlush:
     stmfd   sp!, {r0-r11,lr}
-
-	@disable interrupt
+	
+	@disable interrupt	
 	ldr r8,= 0x4000208
 	ldr r11,[r8]
 	mov r7, #0
-	str r7, [r8]
-
+	str r7, [r8]		
+	
 //---------------------------------------------------------------------------------
 IC_InvalidateAll:
 /*---------------------------------------------------------------------------------
 	Clean and invalidate entire data cache
 ---------------------------------------------------------------------------------*/
 	mcr	p15, 0, r7, c7, c5, 0
-
+		
 //---------------------------------------------------------------------------------
 DC_FlushAll:
 /*---------------------------------------------------------------------------------
@@ -169,63 +275,27 @@ inner_loop:
 	add	r1, r1, #0x40000000
 	cmp	r1, #0
 	bne	outer_loop
-
-//---------------------------------------------------------------------------------
+	
+//---------------------------------------------------------------------------------	
 DC_WaitWriteBufferEmpty:
 //---------------------------------------------------------------------------------               
     MCR     p15, 0, R7,c7,c10, 4
-
+	
 	@restore interrupt
 	str r11, [r8]
-
+	
     ldmfd   sp!, {r0-r11,lr}
     bx      lr
 	.pool
-
-.global DC_FlushRange
-.type	DC_FlushRange STT_FUNC
-DC_FlushRange:
-	MOV             R12, #0
-	ADD             R1, R1, R0
-	BIC             R0, R0, #0x1F
-loop_flush_range :
-	MCR             p15, 0, R12,c7,c10, 4
-	MCR             p15, 0, R0,c7,c14, 1
-	ADD             R0, R0, #0x20
-	CMP             R0, R1
-	BLT             loop_flush_range
-	BX              LR
-
-.global tryLockMutex
-.type	tryLockMutex STT_FUNC
-tryLockMutex:
-adr     r1, mutex    
-mov r2, #1
-mutex_loop:
-    swp r0,r2, [r1]
-    cmp r0, #1
-    beq mutex_fail
-
-mutex_success:
-	mov r2, #1
-    str r2, [r1]
-	mov r0, #1
-	b mutex_exit
-
-mutex_fail:
-	mov r0, #0
-
-mutex_exit:
-	bx  lr
-
-
-.global unLockMutex
-.type	unLockMutex STT_FUNC
-unLockMutex:
-	adr r1, mutex    
-	mov r2, #0
-	str r2, [r1]
-	bx  lr
-
-mutex:
-.word    0x00000000  
+	
+arm7Functions :
+.word    eepromProtect 
+.word    eepromPageErase 
+.word    eepromPageVerify  
+.word    eepromPageWrite  
+.word    eepromPageProg  
+.word    eepromRead  
+.word    cardRead 
+.word    cardId 
+saveCluster:
+.word    0x00000000 

@@ -1,12 +1,12 @@
-#ifndef FIFOCHECK_H
-#define FIFOCHECK_H
+#ifndef NTRCHECK_H
+#define NTRCHECK_H
 
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void SCFGFifoCheck (void);
+void fifocheck (void);
 
 #ifdef __cplusplus
 }

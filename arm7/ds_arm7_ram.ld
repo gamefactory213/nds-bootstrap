@@ -3,18 +3,21 @@ OUTPUT_ARCH(arm)
 ENTRY(_start)
 
 MEMORY {
-
-	vram	: ORIGIN = 0x03780000, LENGTH = 16K /* WRAM A  */
+	rom	: ORIGIN = 0x08000000, LENGTH = 32M
+	ram	: ORIGIN = 0x2380000, LENGTH = 128K
+	iwram	: ORIGIN = 0x037f8000, LENGTH = 96K	
 }
 
-__vram_start	=	ORIGIN(vram);
-__vram_top	=	ORIGIN(vram)+ LENGTH(vram);
-__sp_irq	=	__vram_top - 0x60;
+__iwram_start	=	ORIGIN(iwram);
+__iwram_top	=	ORIGIN(iwram)+ LENGTH(iwram);
+
+__sp_irq	=	__iwram_top - 0x100;
 __sp_svc	=	__sp_irq - 0x100;
 __sp_usr	=	__sp_svc - 0x100;
 
-__irq_flags	=	__vram_top - 8;
-__irq_vector	=	__vram_top - 4;
+__irq_flags	=	0x04000000 - 8;
+__irq_flagsaux	=	0x04000000 - 0x40;
+__irq_vector	=	0x04000000 - 4;
 
 SECTIONS
 {
@@ -23,30 +26,23 @@ SECTIONS
 		__text_start = . ;
 		KEEP (*(.init))
 		. = ALIGN(4);  /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
-		
-	.plt : 
-	{ 
-		*(.plt) 
-	} >vram = 0xff
+		} >ram = 0xff
+	.plt : { *(.plt) } >ram = 0xff
 
 	.text :   /* ALIGN (4): */
 	{
-
-		*(.text*)
-		*(.stub)
+		*(.text .stub .text.* .gnu.linkonce.t.*)
+		KEEP (*(.text.*personality*))
 		/* .gnu.warning sections are handled specially by elf32.em.  */
 		*(.gnu.warning)
-		*(.gnu.linkonce.t*)
-		*(.glue_7)
-		*(.glue_7t)
+		*(.glue_7t) *(.glue_7) *(.vfp11_veneer)
 		. = ALIGN(4);  /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
+	} >ram = 0xff
 
 	.fini           :
 	{
 		KEEP (*(.fini))
-	} >vram =0xff
+	} >ram =0xff
 
 	__text_end = . ;
 
@@ -59,11 +55,11 @@ SECTIONS
 		*(.gnu.linkonce.r*)
 		SORT(CONSTRUCTORS)
 		. = ALIGN(4);   /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
+	} >ram = 0xff
 
-	.ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >vram
+	.ARM.extab   : { *(.ARM.extab* .gnu.linkonce.armextab.*) } >ram
 	__exidx_start = .;
-	.ARM.exidx   : { *(.ARM.exidx* .gnu.linkonce.armexidx.*) } >vram
+	.ARM.exidx   : { *(.ARM.exidx* .gnu.linkonce.armexidx.*) } >ram
 	__exidx_end = .;
 
 /* Ensure the __preinit_array_start label is properly aligned.  We
@@ -72,13 +68,13 @@ SECTIONS
    be empty, which isn't pretty.  */
 	. = ALIGN(32 / 8);
 	PROVIDE (__preinit_array_start = .);
-	.preinit_array     : { KEEP (*(.preinit_array)) } >vram = 0xff
+	.preinit_array     : { KEEP (*(.preinit_array)) } >ram = 0xff
 	PROVIDE (__preinit_array_end = .);
 	PROVIDE (__init_array_start = .);
-	.init_array     : { KEEP (*(.init_array)) } >vram = 0xff
+	.init_array     : { KEEP (*(.init_array)) } >ram = 0xff
 	PROVIDE (__init_array_end = .);
 	PROVIDE (__fini_array_start = .);
-	.fini_array     : { KEEP (*(.fini_array)) } >vram = 0xff
+	.fini_array     : { KEEP (*(.fini_array)) } >ram = 0xff
 	PROVIDE (__fini_array_end = .);
 
 	.ctors :
@@ -94,7 +90,7 @@ SECTIONS
 		KEEP (*(SORT(.ctors.*)))
 		KEEP (*(.ctors))
 		. = ALIGN(4);   /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
+	} >ram = 0xff
 
 	.dtors :
 	{
@@ -103,32 +99,21 @@ SECTIONS
 		KEEP (*(SORT(.dtors.*)))
 		KEEP (*(.dtors))
 		. = ALIGN(4);   /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
+	} >ram = 0xff
 
 	.eh_frame :
 	{
 		KEEP (*(.eh_frame))
 		. = ALIGN(4);   /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
+	} >ram = 0xff
 
 	.gcc_except_table :
 	{
 		*(.gcc_except_table)
 		. = ALIGN(4);   /* REQUIRED. LD is flaky without it. */
-	} >vram = 0xff
-	.jcr            : { KEEP (*(.jcr)) } >vram = 0
-	.got            : { *(.got.plt) *(.got) } >vram = 0
-
-	
-	.vram ALIGN(4) :
-	{
-		__vram_start = ABSOLUTE(.) ;
-		*(.vram)
-		*vram.*(.text)
-		. = ALIGN(4);   /* REQUIRED. LD is flaky without it. */
-		__vram_end = ABSOLUTE(.) ;
-	} >vram = 0xff
-
+	} >ram = 0xff
+	.jcr            : { KEEP (*(.jcr)) } >ram = 0
+	.got            : { *(.got.plt) *(.got) } >ram = 0
 
 	.data ALIGN(4) : 	{
 		__data_start = ABSOLUTE(.);
@@ -138,9 +123,7 @@ SECTIONS
 		CONSTRUCTORS
 		. = ALIGN(4);
 		__data_end = ABSOLUTE(.) ;
-	} >vram = 0xff
-
-
+	} >ram = 0xff
 
 	.bss ALIGN(4) :
 	{
@@ -151,14 +134,9 @@ SECTIONS
 		*(.bss*)
 		*(COMMON)
 		. = ALIGN(4);    /* REQUIRED. LD is flaky without it. */
-	} >vram
-
-	__bss_end = . ;
-	__bss_end__ = . ;
-
-	_end = . ;
-	__end__ = . ;
-	PROVIDE (end = _end);
+		__bss_end__ = ABSOLUTE(.);
+		__end__ = ABSOLUTE(.);
+	} >ram
 
 	/* Stabs debugging sections.  */
 	.stab 0 : { *(.stab) }

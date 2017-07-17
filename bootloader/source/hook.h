@@ -24,6 +24,4 @@
 arm7_hookGame
 Adds a hook in the game's ARM7 binary to our own code
 -------------------------------------------------------------------------*/
-int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData, u32* cheatEngineLocation, u32* cardEngineLocation);
-
-int hookNdsHomebrew (const tNDSHeader* ndsHeader, const u32* cheatData, u32* cheatEngineLocation, u32* dldiengineLocation, u32* wordCommandAddr);
+int hookNdsHomebrew (const tNDSHeader* ndsHeader, u32* dldiEngineLocation, u32* wordCommandAddr);

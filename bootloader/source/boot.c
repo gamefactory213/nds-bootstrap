@@ -50,9 +50,6 @@ Helpful information:
 #include "fat.h"
 #include "dldi_patcher.h"
 #include "card.h"
-#include "card_patcher.h"
-#include "cardengine_arm7_bin.h"
-#include "cardengine_arm9_bin.h"
 #include "boot.h"
 #include "hook.h"
 #include "common.h"
@@ -68,10 +65,7 @@ void sdmmc_controller_init();
 #define NDS_HEAD 0x02FFFE00
 #define TEMP_ARM9_START_ADDRESS (*(vu32*)0x02FFFFF4)
 
-#define CHEAT_ENGINE_LOCATION	0x027FE000
-#define CHEAT_DATA_LOCATION  	0x06010000
-#define ENGINE_LOCATION_ARM7  	0x03780000
-#define ENGINE_LOCATION_ARM9  	0x03700000
+#define SD_ENGINE_LOCATION  	0x037C0000
 
 const char* bootName = "BOOT.NDS";
 
@@ -82,12 +76,6 @@ extern unsigned long wantToPatchDLDI;
 extern unsigned long argStart;
 extern unsigned long argSize;
 extern unsigned long dsiSD;
-extern unsigned long saveFileCluster;
-extern unsigned long donorFileCluster;
-extern unsigned long useArm7Donor;
-extern unsigned long donorSdkVer;
-extern unsigned long patchMpuRegion;
-extern unsigned long patchMpuSize;
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Firmware stuff
@@ -131,15 +119,15 @@ void passArgs_ARM7 (void) {
 	u32 ARM9_LEN = *((u32*)(NDS_HEAD + 0x02C));
 	u32* argSrc;
 	u32* argDst;
-
+	
 	if (!argStart || !argSize) return;
-
+	
 	argSrc = (u32*)(argStart + (int)&_start);
-
+	
 	argDst = (u32*)((ARM9_DST + ARM9_LEN + 3) & ~3);		// Word aligned 
-
+	
 	copyLoop(argDst, argSrc, argSize);
-
+	
 	__system_argv->argvMagic = ARGV_MAGIC;
 	__system_argv->commandLine = (char*)argDst;
 	__system_argv->length = argSize;
@@ -160,7 +148,7 @@ void resetMemory_ARM7 (void)
 	int i;
 	u8 settings1, settings2;
 	u32 settingsOffset = 0;
-
+	
 	REG_IME = 0;
 
 	for (i=0; i<16; i++) {
@@ -180,7 +168,7 @@ void resetMemory_ARM7 (void)
 		TIMER_CR(i) = 0;
 		TIMER_DATA(i) = 0;
 	}
-
+	
 	arm7clearRAM();
 
 	REG_IE = 0;
@@ -188,15 +176,15 @@ void resetMemory_ARM7 (void)
 	(*(vu32*)(0x04000000-4)) = 0;  //IRQ_HANDLER ARM7 version
 	(*(vu32*)(0x04000000-8)) = ~0; //VBLANK_INTR_WAIT_FLAGS, ARM7 version
 	REG_POWERCNT = 1;  //turn off power to stuff
-
+	
 	// Get settings location
 	boot_readFirmware((u32)0x00020, (u8*)&settingsOffset, 0x2);
 	settingsOffset *= 8;
-
+	
 	// Reload DS Firmware settings
 	boot_readFirmware(settingsOffset + 0x070, &settings1, 0x1);
 	boot_readFirmware(settingsOffset + 0x170, &settings2, 0x1);
-
+	
 	if ((settings1 & 0x7F) == ((settings2+1) & 0x7F)) {
 		boot_readFirmware(settingsOffset + 0x000, (u8*)0x02FFFC80, 0x70);
 	} else {
@@ -208,7 +196,7 @@ void resetMemory_ARM7 (void)
 void loadBinary_ARM7 (aFile file)
 {
 	u32 ndsHeader[0x170>>2];
-
+	
 	nocashMessage("loadBinary_ARM7");
 
 	// read NDS header
@@ -221,63 +209,6 @@ void loadBinary_ARM7 (aFile file)
 	u32 ARM7_SRC = ndsHeader[0x030>>2];
 	char* ARM7_DST = (char*)ndsHeader[0x038>>2];
 	u32 ARM7_LEN = ndsHeader[0x03C>>2];
-
-	//Fix Pokemon games needing header data.
-	fileRead ((char*)0x027FF000, file, 0, 0x170);
-	if(*(u32*)(0x27FF00C) == 0x41414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x42414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x43414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x44414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x45414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x46414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x47414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x48414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x49414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x4B414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x4C414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x4D414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x4E414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x4F414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x50414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x51414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x52414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x53414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x54414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x55414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x56414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x57414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x58414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x59414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x5A414441	// Diamond
-	|| *(u32*)(0x27FF00C) == 0x41415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x42415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x43415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x44415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x45415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x46415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x47415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x48415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x49415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x4A415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x4B415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x4C415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x4D415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x4E415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x4F415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x50415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x51415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x52415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x53415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x54415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x55415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x56415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x57415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x58415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x59415041	// Pearl
-	|| *(u32*)(0x27FF00C) == 0x5A415041)	// Pearl
-	{
-		*(u32*)(0x27FF00C) = 0x4A414441;//Make the Pokemon game code ADAJ.
-	}
 	
 	// Load binaries into memory
 	fileRead(ARM9_DST, file, ARM9_SRC, ARM9_LEN);
@@ -297,7 +228,7 @@ Written by Darkain.
 Modified by Chishm:
  * Removed MultiNDS specific stuff
 --------------------------------------------------------------------------*/
-void startBinary_ARM7 (void) {
+void startBinary_ARM7 (void) {	
 	REG_IME=0;
 	while(REG_VCOUNT!=191);
 	while(REG_VCOUNT==191);
@@ -345,54 +276,23 @@ static u32 quickFind (const unsigned char* data, const unsigned char* search, u3
 	return -1;
 }
 
-void initMBK() {
-	// give all DSI WRAM to arm7 at boot
-
-	// arm7 is master of WRAM-A, arm9 of WRAM-B & C
-	REG_MBK9=0x3000000F;
-
-	// WRAM-A fully mapped to arm7
-	*((vu32*)REG_MBK1)=0x8185898D;
-
-	// WRAM-B fully mapped to arm7
-	*((vu32*)REG_MBK2)=0x8D898581;
-	*((vu32*)REG_MBK3)=0x9D999591;
-
-	// WRAM-C fully mapped to arm7
-	*((vu32*)REG_MBK4)=0x8D898581;
-	*((vu32*)REG_MBK5)=0x9D999591;
-
-	// WRAM mapped to the 0x3700000 - 0x37AFFFF area 
-	// WRAM-A mapped to the 0x3780000 - 0x37BFFFF area : 256k
-	REG_MBK6=0x07C03780;
-	// WRAM-B mapped to the 0x3700000 - 0x373FFFF area : 256k
-	REG_MBK7=0x07403700;
-	// WRAM-C mapped to the 0x3740000 - 0x377FFFF area : 256k
-	REG_MBK8=0x07803740;
-}
-
 static const unsigned char dldiMagicString[] = "\xED\xA5\x8D\xBF Chishm";	// Normal DLDI file
 
 int main (void) {
 	nocashMessage("bootloader");
-	initMBK();
-
 	if (dsiSD) {
 		_io_dldi.fn_readSectors = sdmmc_readsectors;
 		_io_dldi.fn_isInserted = sdmmc_inserted;
 		_io_dldi.fn_startup = sdmmc_startup;
 	}
 
+	aFile file = getFileFromCluster (storedFileCluster);
 	// Init card
 	if(!FAT_InitFiles(initDisc))
 	{
 		nocashMessage("!FAT_InitFiles");
 		return -1;
 	}
-
-	aFile file = getFileFromCluster (storedFileCluster);
-	aFile donorFile = getFileFromCluster (donorFileCluster);
-
 	if ((file.firstCluster < CLUSTER_FIRST) || (file.firstCluster >= CLUSTER_EOF)) 	/* Invalid file cluster specified */
 	{
 		file = getBootFileCluster(bootName);
@@ -402,7 +302,7 @@ int main (void) {
 		nocashMessage("fileCluster == CLUSTER_FREE");
 		return -1;
 	}
-
+	
 	// ARM9 clears its memory part 2
 	// copy ARM9 function to RAM, and make the ARM9 jump to it
 	copyLoop((void*)TEMP_MEM, (void*)resetMemory2_ARM9, resetMemory2_ARM9_size);
@@ -413,8 +313,8 @@ int main (void) {
 
 	// Get ARM7 to clear RAM
 	nocashMessage("Get ARM7 to clear RAM");
-	resetMemory_ARM7();
-
+	resetMemory_ARM7();	
+	
 	// ARM9 enters a wait loop
 	// copy ARM9 function to RAM, and make the ARM9 jump to it
 	copyLoop((void*)TEMP_MEM, (void*)startBinary_ARM9, startBinary_ARM9_size);
@@ -423,49 +323,34 @@ int main (void) {
 	// Load the NDS file
 	nocashMessage("Load the NDS file");
 	loadBinary_ARM7(file);
-
+	
 	//wantToPatchDLDI = wantToPatchDLDI && ((u32*)NDS_HEAD)[0x084] > 0x200;
-
-	nocashMessage("try to patch dldi");
-	wantToPatchDLDI = dldiPatchBinary ((u8*)((u32*)NDS_HEAD)[0x0A], ((u32*)NDS_HEAD)[0x0B]);
+	
+	// Patch with DLDI if desired
 	if (wantToPatchDLDI) {
-		nocashMessage("dldi patch successful");
-		// Find the DLDI reserved space in the file
-		u32 patchOffset = quickFind ((u8*)((u32*)NDS_HEAD)[0x0A], dldiMagicString, ((u32*)NDS_HEAD)[0x0B], sizeof(dldiMagicString));
-		u32* wordCommandAddr = (u32 *) (((u32)((u32*)NDS_HEAD)[0x0A])+patchOffset+0x80);
-
-		int error = hookNdsHomebrew(NDS_HEAD, (const u32*)CHEAT_DATA_LOCATION, (u32*)CHEAT_ENGINE_LOCATION, (u32*)ENGINE_LOCATION_ARM7, wordCommandAddr);
-		if(error == ERR_NONE) {
-			nocashMessage("dldi hook Sucessfull");
-		} else {
-			nocashMessage("error during dldi hook");
-		}
-	} else {
-		nocashMessage("dldi Patch Unsuccessful try to patch card");
-		copyLoop (ENGINE_LOCATION_ARM7, (u32*)cardengine_arm7_bin, cardengine_arm7_bin_size);
-		copyLoop (ENGINE_LOCATION_ARM9, (u32*)cardengine_arm9_bin, cardengine_arm9_bin_size);
-
-		module_params_t* params = findModuleParams(NDS_HEAD, donorSdkVer);
-		if(params)
-		{
-			ensureArm9Decompressed(NDS_HEAD, params);
-		}
-
-		patchCardNds(NDS_HEAD,ENGINE_LOCATION_ARM7,ENGINE_LOCATION_ARM9,params,saveFileCluster, patchMpuRegion, patchMpuSize, donorFile, useArm7Donor);
-
-		int error = hookNdsRetail(NDS_HEAD, file, (const u32*)CHEAT_DATA_LOCATION, (u32*)CHEAT_ENGINE_LOCATION, (u32*)ENGINE_LOCATION_ARM7);
+		nocashMessage("try to patch dldi");
+		wantToPatchDLDI = wantToPatchDLDI && dldiPatchBinary ((u8*)((u32*)NDS_HEAD)[0x0A], ((u32*)NDS_HEAD)[0x0B]);
+		if (wantToPatchDLDI) {		
+			nocashMessage("dldi patch successful");
+			// Find the DLDI reserved space in the file
+			u32 patchOffset = quickFind ((u8*)((u32*)NDS_HEAD)[0x0A], dldiMagicString, ((u32*)NDS_HEAD)[0x0B], sizeof(dldiMagicString));
+			u32* wordCommandAddr = (u32 *) (((u32)((u32*)NDS_HEAD)[0x0A])+patchOffset+0x80);
+			
+			int error = hookNdsHomebrew(NDS_HEAD, (u32*)SD_ENGINE_LOCATION, wordCommandAddr);
 			if(error == ERR_NONE) {
-			nocashMessage("card hook Sucessfull");
-		} else {
-			nocashMessage("error during card hook");
+				nocashMessage("dldi hook Sucessfull");
+			} else {
+				nocashMessage("error during dldi hook");
+			}
+		} else {	
+			nocashMessage("dldi Patch Unsuccessful");
 		}
-	}
- 
-
+	} 
+	
 
 	// Pass command line arguments to loaded program
 	//passArgs_ARM7();
-
+	
 	nocashMessage("Start the NDS file");
 	startBinary_ARM7();
 

@@ -16,7 +16,7 @@ include $(DEVKITARM)/ds_rules
 # INCLUDES is a list of directories containing header files
 # SPECS is the directory containing the important build and link files
 #---------------------------------------------------------------------------------
-export TARGET		:=	cardengine_arm9
+export TARGET		:=	cardengine
 BUILD		:=	build
 SOURCES		:=	source
 DATA		:=	data
@@ -33,12 +33,11 @@ CFLAGS	:=	-g -Wall -O2\
 			-ffast-math \
 			$(ARCH)
 
-# ADD -DDEBUG here for logging/debug
-CFLAGS	+=	$(INCLUDE) -DARM9 -fPIC -std=gnu99
+CFLAGS	+=	$(INCLUDE) -DARM7 -std=gnu99
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions
 
-ASFLAGS	:=	-g $(ARCH) $(INCLUDE) 
+ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-nostartfiles -T ../cardengine.ld -g $(ARCH) -Wl,-Map,$(TARGET).map
 
 LIBS	:= 

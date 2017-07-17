@@ -16,20 +16,21 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef CARD_ENGINE_ARM9_H
-#define CARD_ENGINE_ARM9_H
+#ifndef DEBUG_TO_FILE_H
+#define DEBUG_TO_FILE_H
+
+#include "fat.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define is_aligned(POINTER, BYTE_COUNT) \
-    (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
-
-int cardRead (u32* cacheStruct);
+u32 dbg_printf( char * message);
+u32 dbg_hexa(u32 n);
+void enableDebug(aFile debugFileCluster);	
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // CARD_ENGINE_ARM9_H
+#endif // DEBUG_TO_FILE_H
