@@ -283,6 +283,11 @@ void loadBinary_ARM7 (aFile file)
 	fileRead(ARM9_DST, file, ARM9_SRC, ARM9_LEN);
 	fileRead(ARM7_DST, file, ARM7_SRC, ARM7_LEN);
 
+        if(*(u32*)(0x27FF00C) == 0x454C5741){
+                *(u32*)(0x203E7B0) = 0;
+        }
+
+	
 	// first copy the header to its proper location, excluding
 	// the ARM9 start address, so as not to start it
 	TEMP_ARM9_START_ADDRESS = ndsHeader[0x024>>2];		// Store for later
