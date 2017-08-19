@@ -224,11 +224,12 @@ void loadBinary_ARM7 (aFile file)
 
 	//Fix Pokemon games needing header data.
 	fileRead ((char*)0x027FF000, file, 0, 0x170);
-	if(*(u32*)(0x27FF00C) & 0x00FFFFFF == 0x414441	// Diamond
-	|| *(u32*)(0x27FF00C) & 0x00FFFFFF == 0x415041	// Pearl
-	|| *(u32*)(0x27FF00C) & 0x00FFFFFF == 0x415043	// Platinum
-	|| *(u32*)(0x27FF00C) & 0x00FFFFFF == 0x4B5049	// HG
-	|| *(u32*)(0x27FF00C) & 0x00FFFFFF == 0x475049)// SS
+
+	if((*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x414441	// Diamond
+	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x415041	// Pearl
+	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x555043	// Platinum
+	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x4B5049	// HG
+	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x475049)	// SS
 	{
 		*(u32*)(0x27FF00C) = 0x4A414441;//Make the Pokemon game code ADAJ.
 	}
@@ -236,12 +237,12 @@ void loadBinary_ARM7 (aFile file)
 	// Load binaries into memory
 	fileRead(ARM9_DST, file, ARM9_SRC, ARM9_LEN);
 	fileRead(ARM7_DST, file, ARM7_SRC, ARM7_LEN);
-
-        if(*(u32*)(0x27FF00C) == 0x454C5741){
+	
+	if(*(u32*)(0x27FF00C) == 0x454C5741){
                 *(u32*)(0x203E7B0) = 0;
         }
 
-	
+
 	// first copy the header to its proper location, excluding
 	// the ARM9 start address, so as not to start it
 	TEMP_ARM9_START_ADDRESS = ndsHeader[0x024>>2];		// Store for later
