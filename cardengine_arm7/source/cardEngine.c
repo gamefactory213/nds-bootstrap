@@ -41,6 +41,12 @@ static aFile savFile;
 static bool timeoutRun = true;
 static int timeoutTimer = 0;
 
+static bool ntrTouchSettingChecked = false;
+static bool ntrTouch = false;
+
+static bool compatibilityCheckSettingChecked = false;
+static bool compatibilityCheck = false;
+
 void initLogging() {
 	if(!initialized) {
 		if (sdmmc_read16(REG_SDSTATUS0) != 0) {
@@ -115,113 +121,126 @@ void runCardEngineCheck (void) {
 	nocashMessage("runCardEngineCheck");
 	#endif
 
-	// Control volume with the - and + buttons.
-	u8 volLevel;
-	u8 i2cVolLevel = i2cReadRegister(0x4A, 0x40);
-	switch(i2cVolLevel) {
-		case 0x00:
-		default:
-			volLevel = 0;
-			break;
-		case 0x01:
-			volLevel = 0;
-			break;
-		case 0x02:
-			volLevel = 1;
-			break;
-		case 0x03:
-			volLevel = 1;
-			break;
-		case 0x04:
-			volLevel = 3;
-			break;
-		case 0x05:
-			volLevel = 3;
-			break;
-		case 0x06:
-			volLevel = 6;
-			break;
-		case 0x07:
-			volLevel = 6;
-			break;
-		case 0x08:
-			volLevel = 10;
-			break;
-		case 0x09:
-			volLevel = 10;
-			break;
-		case 0x0A:
-			volLevel = 15;
-			break;
-		case 0x0B:
-			volLevel = 15;
-			break;
-		case 0x0C:
-			volLevel = 21;
-			break;
-		case 0x0D:
-			volLevel = 21;
-			break;
-		case 0x0E:
-			volLevel = 28;
-			break;
-		case 0x0F:
-			volLevel = 28;
-			break;
-		case 0x10:
-			volLevel = 36;
-			break;
-		case 0x11:
-			volLevel = 36;
-			break;
-		case 0x12:
-			volLevel = 45;
-			break;
-		case 0x13:
-			volLevel = 45;
-			break;
-		case 0x14:
-			volLevel = 55;
-			break;
-		case 0x15:
-			volLevel = 55;
-			break;
-		case 0x16:
-			volLevel = 66;
-			break;
-		case 0x17:
-			volLevel = 66;
-			break;
-		case 0x18:
-			volLevel = 78;
-			break;
-		case 0x19:
-			volLevel = 78;
-			break;
-		case 0x1A:
-			volLevel = 91;
-			break;
-		case 0x1B:
-			volLevel = 91;
-			break;
-		case 0x1C:
-			volLevel = 105;
-			break;
-		case 0x1D:
-			volLevel = 105;
-			break;
-		case 0x1E:
-			volLevel = 120;
-			break;
-		case 0x1F:
-			volLevel = 120;
-			break;
+	if(!ntrTouchSettingChecked) {
+		u8 setting = i2cReadRegister(0x4A, 0x74);
+		if(setting == 0x01) ntrTouch = true;
+		ntrTouchSettingChecked = true;
 	}
-	REG_MASTER_VOLUME = volLevel;
+	
+	if(ntrTouch) {
+		// Control volume with the - and + buttons.
+		u8 volLevel;
+		u8 i2cVolLevel = i2cReadRegister(0x4A, 0x40);
+		switch(i2cVolLevel) {
+			case 0x00:
+			default:
+				volLevel = 0;
+				break;
+			case 0x01:
+				volLevel = 0;
+				break;
+			case 0x02:
+				volLevel = 1;
+				break;
+			case 0x03:
+				volLevel = 1;
+				break;
+			case 0x04:
+				volLevel = 3;
+				break;
+			case 0x05:
+				volLevel = 3;
+				break;
+			case 0x06:
+				volLevel = 6;
+				break;
+			case 0x07:
+				volLevel = 6;
+				break;
+			case 0x08:
+				volLevel = 10;
+				break;
+			case 0x09:
+				volLevel = 10;
+				break;
+			case 0x0A:
+				volLevel = 15;
+				break;
+			case 0x0B:
+				volLevel = 15;
+				break;
+			case 0x0C:
+				volLevel = 21;
+				break;
+			case 0x0D:
+				volLevel = 21;
+				break;
+			case 0x0E:
+				volLevel = 28;
+				break;
+			case 0x0F:
+				volLevel = 28;
+				break;
+			case 0x10:
+				volLevel = 36;
+				break;
+			case 0x11:
+				volLevel = 36;
+				break;
+			case 0x12:
+				volLevel = 45;
+				break;
+			case 0x13:
+				volLevel = 45;
+				break;
+			case 0x14:
+				volLevel = 55;
+				break;
+			case 0x15:
+				volLevel = 55;
+				break;
+			case 0x16:
+				volLevel = 66;
+				break;
+			case 0x17:
+				volLevel = 66;
+				break;
+			case 0x18:
+				volLevel = 78;
+				break;
+			case 0x19:
+				volLevel = 78;
+				break;
+			case 0x1A:
+				volLevel = 91;
+				break;
+			case 0x1B:
+				volLevel = 91;
+				break;
+			case 0x1C:
+				volLevel = 105;
+				break;
+			case 0x1D:
+				volLevel = 105;
+				break;
+			case 0x1E:
+				volLevel = 120;
+				break;
+			case 0x1F:
+				volLevel = 120;
+				break;
+		}
+		REG_MASTER_VOLUME = volLevel;
+	}
+	
+	if(!compatibilityCheckSettingChecked) {
+		u8 setting = i2cReadRegister(0x4A, 0x73);
+		if(setting == 0x01) compatibilityCheck = true;
+		compatibilityCheckSettingChecked = true;
+	}
 	
 	if (timeoutRun) {
-		u8 setting = i2cReadRegister(0x4A, 0x73);
-		if (setting == 0x01) {
+		if (compatibilityCheck) {
 			timeoutTimer += 1;
 			if (timeoutTimer == 60*2) {
 				memcpy((u32*)0x02000000,sr_data_error,0x560);
