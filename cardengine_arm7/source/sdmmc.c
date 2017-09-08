@@ -4,8 +4,6 @@
 
 static struct mmcdevice deviceSD;
 
-extern bool ndmaUsed;
-
 /*mmcdevice *getMMCDevice(int drive) {
     if(drive==0) return &deviceNAND;
     return &deviceSD;
@@ -467,12 +465,8 @@ int __attribute__((noinline)) sdmmc_sdcard_readsectors(u32 sector_no, u32 numsec
     sdmmc_write16(REG_SDBLKCOUNT,numsectors);
     deviceSD.data = out;
     deviceSD.size = numsectors << 9;
-	if(ndmaUsed) {
-		*(u32*)(0x2000000) = sector_no;
-		sdmmc_send_command_ndma(&deviceSD,0x33C12,sector_no);
-	} else {
-		sdmmc_send_command(&deviceSD,0x33C12,sector_no);
-	}
+	*(u32*)(0x2000000) = sector_no;
+    sdmmc_send_command_ndma(&deviceSD,0x33C12,sector_no);
     return geterror(&deviceSD);
 }
 

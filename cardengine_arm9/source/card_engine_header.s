@@ -14,11 +14,6 @@
 .global sdk_version
 .global fileCluster
 .global saveCluster
-.global ROM_LOCATION
-.global ROM_TID
-.global flagsSet
-.global ROMinRAM
-.global dsiWramUsed
 
 #define ICACHE_SIZE	0x2000
 #define DCACHE_SIZE	0x1000
@@ -38,17 +33,6 @@ fileCluster:
 cardStruct:
 	.word	0x00000000
 cacheStruct:
-	.word	0x00000000
-
-ROM_LOCATION:
-	.word	0x0C800000
-ROM_TID:
-	.word	0x00000000
-flagsSet:
-	.word	0x00000000
-ROMinRAM:
-	.word	0x00000000
-dsiWramUsed:
 	.word	0x00000000
 
 @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
