@@ -47,6 +47,8 @@ static bool ntrTouch = false;
 static bool compatibilityCheckSettingChecked = false;
 static bool compatibilityCheck = false;
 
+bool ndmaUsed = false;
+
 void initLogging() {
 	if(!initialized) {
 		if (sdmmc_read16(REG_SDSTATUS0) != 0) {
@@ -243,7 +245,7 @@ void runCardEngineCheck (void) {
 		if (compatibilityCheck) {
 			timeoutTimer += 1;
 			if (timeoutTimer == 60*2) {
-				memcpy((u32*)0x02000000,sr_data_error,0x560);
+				memcpy((u32*)0x02000300,sr_data_error,0x020);
 				i2cWriteRegister(0x4a,0x70,0x01);
 				i2cWriteRegister(0x4a,0x11,0x01);	// If on white screen for a while, the game is incompatible, so show an error screen
 			}
@@ -506,7 +508,9 @@ bool cardRead (u32 dma,  u32 src, void *dst, u32 len) {
 	timeoutRun = false;	// Do not show error screen
 
 	cardReadLED(true);    // When a file is loading, turn on LED for card read indicator
+	//ndmaUsed = false;
 	fileRead(dst,romFile,src,len);
+	//ndmaUsed = true;
 	cardReadLED(false);    // After loading is done, turn off LED for card read indicator
 
 	return true;
