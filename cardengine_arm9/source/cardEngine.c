@@ -344,8 +344,6 @@ void accessCounterIncrease() {
 int cardRead (u32* cacheStruct) {
 	//nocashMessage("\narm9 cardRead\n");
 
-	setExceptionHandler2();
-
 	u8* cacheBuffer = (u8*)(cacheStruct + 8);
 	u32* cachePage = cacheStruct + 2;
 	u32 commandRead;
@@ -371,7 +369,15 @@ int cardRead (u32* cacheStruct) {
 		while(sharedAddr[3] != (vu32)0);
 
 		ROM_TID = tempNdsHeader[0x00C>>2];
-		
+
+		// ExceptionHandler2 (red screen) blacklist
+		if((ROM_TID & 0x00FFFFFF) != 0x4D5341	// SM64DS
+		&& (ROM_TID & 0x00FFFFFF) != 0x443241	// NSMB
+		&& (ROM_TID & 0x00FFFFFF) != 0x4D4441)	// AC:WW
+		{
+			setExceptionHandler2();
+		}
+
 		if((ROM_TID & 0x00FFFFFF) == 0x5A3642	// MegaMan Zero Collection
 		|| (ROM_TID & 0x00FFFFFF) == 0x494B42	// Zelda: Spirit Tracks
 		|| (ROM_TID & 0x00FFFFFF) == 0x583642	// Rockman EXE: Operation Shooting Star
@@ -412,6 +418,8 @@ int cardRead (u32* cacheStruct) {
 			sharedAddr[1] = romSize;
 			sharedAddr[2] = 0x4000+ARM9_LEN;
 			sharedAddr[3] = commandRead;
+			if(romSize > 0x00800000 && romSize <= 0x00C00000) sharedAddr[4] = true;
+			else sharedAddr[4] = false;
 
 			IPC_SendSync(0xEE24);
 
@@ -458,6 +466,9 @@ int cardRead (u32* cacheStruct) {
 		} else if((ROM_TID & 0x00FFFFFF) == 0x4D5241) {
 			selectedSize = 13;
 			CACHE_READ_SIZE = _256KB_READ_SIZE;
+		} else if((ROM_TID & 0x00FFFFFF) == 0x4B4C41) {
+			selectedSize = 12;
+			CACHE_READ_SIZE = _128KB_READ_SIZE;
 		} else {
 			if(len <= _64KB_READ_SIZE) {
 				selectedSize = 1;
