@@ -112,6 +112,11 @@ void runFile(string filename, string savPath, string arm7DonorPath, u32 useArm7D
 	}
 }
 
+typedef struct {
+	char gameTitle[12];			//!< 12 characters for the game title.
+	char gameCode[4];			//!< 4 characters for the game code.
+} sNDSHeadertitlecodeonly;
+
 void getSFCG_ARM9() {
 	iprintf( "SCFG_ROM ARM9 %x\n", REG_SCFG_ROM ); 
 	iprintf( "SCFG_CLK ARM9 %x\n", REG_SCFG_CLK ); 
