@@ -154,8 +154,18 @@ int main(void) {
 	}
 
 	if(fifoCheckValue32(FIFO_USER_04)) {
-		i2cWriteRegister(0x4A, 0x73, 0x01);		// Set to run comptibility check
+		i2cWriteRegister(0x4A, 0x73, 0x01);		// Set to run compatibility check
 	}
+
+	if(fifoCheckValue32(FIFO_USER_07)) {
+		i2cWriteRegister(0x4A, 0x74, 0x01);		// Set to turn on soft-reset button combo
+	}
+
+	if(fifoCheckValue32(FIFO_USER_08)) {
+		disableSlot1();							// Disable Slot-1 access
+	}
+	
+	SCFGFifoCheck();
 	//
 	fifoSendValue32(FIFO_USER_05, 1);
 
@@ -163,7 +173,6 @@ int main(void) {
 
 	// Keep the ARM7 mostly idle
 	while (1) {
-		SCFGFifoCheck();
 		swiWaitForVBlank();
 	}
 }
