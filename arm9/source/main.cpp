@@ -220,8 +220,6 @@ int main( int argc, char **argv) {
 			getSFCG_ARM7();
 		}
 
-		fatInitDefault();
-		nocashMessage("fatInitDefault");
 		reinittimer = 0;
 
 		int romread_LED = bootstrapini.GetInt("NDS-BOOTSTRAP","ROMREAD_LED",1);
@@ -246,7 +244,6 @@ int main( int argc, char **argv) {
 		std::string	ndsPath = bootstrapini.GetString( "NDS-BOOTSTRAP", "NDS_PATH", "");
 		reinittimer = 0;
 
-		// 
 		FILE *f_nds_file = fopen(ndsPath.c_str(), "rb");
 
 		char game_TID[5];
@@ -260,7 +257,6 @@ int main( int argc, char **argv) {
 		
 		if (strcmp(game_TID, "I") != 0) {
 			disableSlot1();	// Disable Slot-1 access for games with no built-in Infrared port
-			fifoSendValue32(FIFO_USER_08, 1);
 		}
 
 		bool run_timeout = bootstrapini.GetInt( "NDS-BOOTSTRAP", "CHECK_COMPATIBILITY", 1);
