@@ -180,7 +180,7 @@ void initMBK() {
 bool consoleInited = false;
 
 int reinittimer = 0;
-bool run_reinittimer = true;
+bool run_reinittimer = false;
 //---------------------------------------------------------------------------------
 void VcountHandler() {
 //---------------------------------------------------------------------------------
@@ -211,10 +211,10 @@ int main( int argc, char **argv) {
 	initMBK();
 
 	// switch to NTR mode
-	REG_SCFG_EXT = 0x83000000; // NAND/SD Access
+	//REG_SCFG_EXT = 0x83000000; // NAND/SD Access
 
-	InitSD();
-	if (isMounted) {
+	//InitSD();
+	if (fatInitDefault()) {
 		nocashMessage("fatInitDefault");
 		CIniFile bootstrapini( "sd:/_nds/nds-bootstrap.ini" );
 
