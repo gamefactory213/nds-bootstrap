@@ -37,6 +37,7 @@ License:
 #define CLUSTER_FREE	0x00000000
 #define	CLUSTER_EOF		0x0FFFFFFF
 #define CLUSTER_FIRST	0x00000002
+#define BYTES_PER_SECTOR 512
 
 typedef	struct
 {
@@ -44,6 +45,7 @@ typedef	struct
 	u32	currentCluster;
 	u32 currentOffset;
 	bool fatTableCached;
+	bool oneClusterCached;
 	u32* fatTableCache;
 	u32 fatTableCacheSize;
 } aFile;

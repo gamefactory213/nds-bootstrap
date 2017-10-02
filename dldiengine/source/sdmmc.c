@@ -1,16 +1,25 @@
-#include <nds.h>
-#include "sdmmc.h"
+#include <nds/system.h>
+#include <nds/bios.h>
+#include <nds/arm7/sdmmc.h>
+#include <nds/interrupts.h>
+#include <nds/fifocommon.h>
+#include <nds/fifomessages.h>
+
+#include <stddef.h>
 #include "disc_io.h"
 
+
 static struct mmcdevice deviceSD;
+static struct mmcdevice deviceNAND;
 
 /*mmcdevice *getMMCDevice(int drive) {
     if(drive==0) return &deviceNAND;
     return &deviceSD;
 }
 */
+
 //---------------------------------------------------------------------------------
-int __attribute__((noinline)) geterror(struct mmcdevice *ctx) {
+int geterror(struct mmcdevice *ctx) {
 //---------------------------------------------------------------------------------
     //if(ctx->error == 0x4) return -1;
     //else return 0;
@@ -19,7 +28,7 @@ int __attribute__((noinline)) geterror(struct mmcdevice *ctx) {
 
 
 //---------------------------------------------------------------------------------
-void __attribute__((noinline)) setTarget(struct mmcdevice *ctx) {
+void setTarget(struct mmcdevice *ctx) {
 //---------------------------------------------------------------------------------
     sdmmc_mask16(REG_SDPORTSEL,0x3,(u16)ctx->devicenumber);
     setckl(ctx->clk);
@@ -33,7 +42,7 @@ void __attribute__((noinline)) setTarget(struct mmcdevice *ctx) {
 
 
 //---------------------------------------------------------------------------------
-void __attribute__((noinline)) sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
+void sdmmc_send_command(struct mmcdevice *ctx, uint32_t cmd, uint32_t args) {
 //---------------------------------------------------------------------------------
 	int i;
     bool getSDRESP = (cmd << 15) >> 31;
@@ -57,7 +66,7 @@ void __attribute__((noinline)) sdmmc_send_command(struct mmcdevice *ctx, uint32_
 //  if(writedata)sdmmc_mask16(REG_DATACTL32, 0x800, 0x1000);
 //  sdmmc_mask16(REG_DATACTL32,0x1800,2);
 #else
-    sdmmc_mask16(REG_SDDATACTL32,0x1800,0);
+    sdmmc_mask16(REG_DATACTL32,0x1800,0);
 #endif
     sdmmc_write16(REG_SDCMDARG0,args &0xFFFF);
     sdmmc_write16(REG_SDCMDARG1,args >> 16);
@@ -67,7 +76,7 @@ void __attribute__((noinline)) sdmmc_send_command(struct mmcdevice *ctx, uint32_
     uint16_t *dataPtr = (uint16_t*)ctx->data;
     uint32_t *dataPtr32 = (uint32_t*)ctx->data;
 
-    bool useBuf = ( 0 != dataPtr );
+    bool useBuf = ( NULL != dataPtr );
     bool useBuf32 = (useBuf && (0 == (3 & ((uint32_t)dataPtr))));
 
     uint16_t status0 = 0;
@@ -170,9 +179,15 @@ int sdmmc_cardinserted() {
 	return 1; //sdmmc_cardready;
 }
 
+
+static bool sdmmc_controller_initialised = false;
+
 //---------------------------------------------------------------------------------
-void sdmmc_controller_init(bool force_init) {
+void sdmmc_controller_init( bool force_init ) {
 //---------------------------------------------------------------------------------
+
+    if (!force_init && sdmmc_controller_initialised) return;
+
     deviceSD.isSDHC = 0;
     deviceSD.SDOPT = 0;
     deviceSD.res = 0;
@@ -180,12 +195,21 @@ void sdmmc_controller_init(bool force_init) {
     deviceSD.clk = 0x80;
     deviceSD.devicenumber = 0;
 
+    deviceNAND.isSDHC = 0;
+    deviceNAND.SDOPT = 0;
+    deviceNAND.res = 0;
+    deviceNAND.initarg = 1;
+    deviceNAND.clk = 0x80;
+    deviceNAND.devicenumber = 1;
+
     *(vu16*)(SDMMC_BASE + REG_SDDATACTL32) &= 0xF7FFu;
     *(vu16*)(SDMMC_BASE + REG_SDDATACTL32) &= 0xEFFFu;
+#ifdef DATA32_SUPPORT
     *(vu16*)(SDMMC_BASE + REG_SDDATACTL32) |= 0x402u;
-
-    *(vu16*)(SDMMC_BASE + REG_SDDATACTL) = (*(vu16*)(SDMMC_BASE + 0xd8) & 0xFFDD) | 2;
-
+#else
+    *(vu16*)(SDMMC_BASE + REG_SDDATACTL32) |= 0x402u;
+#endif
+    *(vu16*)(SDMMC_BASE + REG_SDDATACTL) = (*(vu16*)(SDMMC_BASE + REG_SDDATACTL) & 0xFFDD) | 2;
 #ifdef DATA32_SUPPORT
     *(vu16*)(SDMMC_BASE + REG_SDDATACTL32) &= 0xFFFFu;
     *(vu16*)(SDMMC_BASE + REG_SDDATACTL) &= 0xFFDFu;
@@ -195,14 +219,14 @@ void sdmmc_controller_init(bool force_init) {
     *(vu16*)(SDMMC_BASE + REG_SDDATACTL) &= 0xFFDDu;
     *(vu16*)(SDMMC_BASE + REG_SDBLKLEN32) = 0;
 #endif
-    *(vu16*)(SDMMC_BASE + REG_SDBLKCOUNT32) = 1; //SDBLKCOUNT32
-    *(vu16*)(SDMMC_BASE + REG_SDRESET) &= 0xFFFEu; //SDRESET
-    *(vu16*)(SDMMC_BASE + REG_SDRESET) |= 1u; //SDRESET
+    *(vu16*)(SDMMC_BASE + REG_SDBLKCOUNT32) = 1;
+    *(vu16*)(SDMMC_BASE + REG_SDRESET) &= 0xFFFEu;
+    *(vu16*)(SDMMC_BASE + REG_SDRESET) |= 1u;
     *(vu16*)(SDMMC_BASE + REG_SDIRMASK0) |= TMIO_MASK_ALL;
     *(vu16*)(SDMMC_BASE + REG_SDIRMASK1) |= TMIO_MASK_ALL>>16;
     *(vu16*)(SDMMC_BASE + 0x0fc) |= 0xDBu; //SDCTL_RESERVED7
     *(vu16*)(SDMMC_BASE + 0x0fe) |= 0xDBu; //SDCTL_RESERVED8
-    *(vu16*)(SDMMC_BASE + REG_SDPORTSEL) &= 0xFFFCu; //SDPORTSEL
+    *(vu16*)(SDMMC_BASE + REG_SDPORTSEL) &= 0xFFFCu;
 #ifdef DATA32_SUPPORT
     *(vu16*)(SDMMC_BASE + REG_SDCLKCTL) = 0x20;
     *(vu16*)(SDMMC_BASE + REG_SDOPT) = 0x40EE;
@@ -210,9 +234,11 @@ void sdmmc_controller_init(bool force_init) {
     *(vu16*)(SDMMC_BASE + REG_SDCLKCTL) = 0x40; //Nintendo sets this to 0x20
     *(vu16*)(SDMMC_BASE + REG_SDOPT) = 0x40EB; //Nintendo sets this to 0x40EE
 #endif
-    *(vu16*)(SDMMC_BASE + REG_SDPORTSEL) &= 0xFFFCu; ////SDPORTSEL
-    *(vu16*)(SDMMC_BASE + REG_SDBLKLEN) = 512; //SDBLKLEN
-    *(vu16*)(SDMMC_BASE + REG_SDSTOP) = 0; //SDSTOP
+    *(vu16*)(SDMMC_BASE + REG_SDPORTSEL) &= 0xFFFCu;
+    *(vu16*)(SDMMC_BASE + REG_SDBLKLEN) = 512;
+    *(vu16*)(SDMMC_BASE + REG_SDSTOP) = 0;
+
+    sdmmc_controller_initialised = true;
 
     setTarget(&deviceSD);
 }
@@ -250,20 +276,25 @@ int sdmmc_sdcard_init() {
 //---------------------------------------------------------------------------------
     setTarget(&deviceSD);
     swiDelay(0xF000);
+
+    // card reset
     sdmmc_send_command(&deviceSD,0,0);
+
+    // CMD8 0x1AA
     sdmmc_send_command(&deviceSD,0x10408,0x1AA);
     u32 temp = (deviceSD.error & 0x1) << 0x1E;
 
     u32 temp2 = 0;
     do {
         do {
+            // CMD55
             sdmmc_send_command(&deviceSD,0x10437,deviceSD.initarg << 0x10);
+            // ACMD41
             sdmmc_send_command(&deviceSD,0x10769,0x00FF8000 | temp);
             temp2 = 1;
         } while ( !(deviceSD.error & 1) );
 
     } while((deviceSD.ret[0] & 0x80000000) == 0);
-
 
     if(!((deviceSD.ret[0] >> 30) & 1) || !temp)
         temp2 = 0;
@@ -287,6 +318,15 @@ int sdmmc_sdcard_init() {
     sdmmc_send_command(&deviceSD,0x10507,deviceSD.initarg << 0x10);
     if (deviceSD.error & 0x4) return -1;
 
+    // CMD55
+    sdmmc_send_command(&deviceSD,0x10437,deviceSD.initarg << 0x10);
+    if (deviceSD.error & 0x4) return -1;
+
+    // ACMD42
+    sdmmc_send_command(&deviceSD,0x1076A,0x0);
+    if (deviceSD.error & 0x4) return -1;
+
+    // CMD55
     sdmmc_send_command(&deviceSD,0x10437,deviceSD.initarg << 0x10);
     if (deviceSD.error & 0x4) return -1;
 
@@ -305,11 +345,63 @@ int sdmmc_sdcard_init() {
 
 }
 
+//---------------------------------------------------------------------------------
+int sdmmc_nand_init() {
+//---------------------------------------------------------------------------------
+    setTarget(&deviceNAND);
+    swiDelay(0xF000);
 
-int __attribute__((noinline)) sdmmc_sdcard_readsectors(u32 sector_no, u32 numsectors, void *out) {
-    if (deviceSD.isSDHC == 0)
-        sector_no <<= 9;
+    sdmmc_send_command(&deviceNAND,0,0);
+
+    do {
+        do {
+            sdmmc_send_command(&deviceNAND,0x10701,0x100000);
+        } while ( !(deviceNAND.error & 1) );
+    }
+    while((deviceNAND.ret[0] & 0x80000000) == 0);
+
+    sdmmc_send_command(&deviceNAND,0x10602,0x0);
+    if((deviceNAND.error & 0x4))return -1;
+
+    sdmmc_send_command(&deviceNAND,0x10403,deviceNAND.initarg << 0x10);
+    if((deviceNAND.error & 0x4))return -1;
+
+    sdmmc_send_command(&deviceNAND,0x10609,deviceNAND.initarg << 0x10);
+    if((deviceNAND.error & 0x4))return -1;
+
+    deviceNAND.total_size = calcSDSize((uint8_t*)&deviceNAND.ret[0],0);
+    deviceNAND.clk = 1;
+    setckl(1);
+
+    sdmmc_send_command(&deviceNAND,0x10407,deviceNAND.initarg << 0x10);
+    if((deviceNAND.error & 0x4))return -1;
+
+    deviceNAND.SDOPT = 1;
+
+    sdmmc_send_command(&deviceNAND,0x10506,0x3B70100);
+    if((deviceNAND.error & 0x4))return -1;
+
+    sdmmc_send_command(&deviceNAND,0x10506,0x3B90100);
+    if((deviceNAND.error & 0x4))return -1;
+
+    sdmmc_send_command(&deviceNAND,0x1040D,deviceNAND.initarg << 0x10);
+    if((deviceNAND.error & 0x4))return -1;
+
+    sdmmc_send_command(&deviceNAND,0x10410,0x200);
+    if((deviceNAND.error & 0x4))return -1;
+
+    deviceNAND.clk |= 0x200;
+
     setTarget(&deviceSD);
+
+    return 0;
+}
+
+//---------------------------------------------------------------------------------
+int sdmmc_readsectors(struct mmcdevice *device, u32 sector_no, u32 numsectors, void *out) {
+//---------------------------------------------------------------------------------
+    if (device->isSDHC == 0) sector_no <<= 9;
+    setTarget(device);
     sdmmc_write16(REG_SDSTOP,0x100);
 
 #ifdef DATA32_SUPPORT
@@ -318,16 +410,19 @@ int __attribute__((noinline)) sdmmc_sdcard_readsectors(u32 sector_no, u32 numsec
 #endif
 
     sdmmc_write16(REG_SDBLKCOUNT,numsectors);
-    deviceSD.data = out;
-    deviceSD.size = numsectors << 9;
-    sdmmc_send_command(&deviceSD,0x33C12,sector_no);
-    return geterror(&deviceSD);
+    device->data = out;
+    device->size = numsectors << 9;
+    sdmmc_send_command(device,0x33C12,sector_no);
+    setTarget(&deviceSD);
+    return geterror(device);
 }
 
-int __attribute__((noinline)) sdmmc_sdcard_writesectors(u32 sector_no, u32 numsectors, void *in) {
-    if (deviceSD.isSDHC == 0)
+//---------------------------------------------------------------------------------
+int sdmmc_writesectors(struct mmcdevice *device, u32 sector_no, u32 numsectors, void *in) {
+//---------------------------------------------------------------------------------
+    if (device->isSDHC == 0)
         sector_no <<= 9;
-    setTarget(&deviceSD);
+    setTarget(device);
     sdmmc_write16(REG_SDSTOP,0x100);
 
 #ifdef DATA32_SUPPORT
@@ -336,92 +431,109 @@ int __attribute__((noinline)) sdmmc_sdcard_writesectors(u32 sector_no, u32 numse
 #endif
 
     sdmmc_write16(REG_SDBLKCOUNT,numsectors);
-    deviceSD.data = in;
-    deviceSD.size = numsectors << 9;
-    sdmmc_send_command(&deviceSD,0x52C19,sector_no);
-    return geterror(&deviceSD);
+    device->data = in;
+    device->size = numsectors << 9;
+    sdmmc_send_command(device,0x52C19,sector_no);
+    setTarget(&deviceSD);
+    return geterror(device);
 }
 
-/*-----------------------------------------------------------------
-startUp
-Initialize the interface, geting it into an idle, ready state
-returns true if successful, otherwise returns false
------------------------------------------------------------------*/
-bool startup(void) {	
-	nocashMessage("startup internal");
-	return true;	
+//---------------------------------------------------------------------------------
+void sdmmc_get_cid(int devicenumber, u32 *cid) {
+//---------------------------------------------------------------------------------
+
+    struct mmcdevice *device = (devicenumber == 1 ? &deviceNAND : &deviceSD);
+
+    int oldIME = enterCriticalSection();
+
+    setTarget(device);
+
+    // use cmd7 to put sd card in standby mode
+    // CMD7
+    sdmmc_send_command(device, 0x10507, 0);
+
+    // get sd card info
+    // use cmd10 to read CID
+    sdmmc_send_command(device, 0x1060A, device->initarg << 0x10);
+
+    for(int i = 0; i < 4; ++i)
+        cid[i] = device->ret[i];
+
+    // put sd card back to transfer mode
+    // CMD7
+    sdmmc_send_command(device, 0x10507, device->initarg << 0x10);
+
+    leaveCriticalSection(oldIME);
 }
 
-/*-----------------------------------------------------------------
-isInserted
-Is a card inserted?
-return true if a card is inserted and usable
------------------------------------------------------------------*/
-bool isInserted (void) {
-	nocashMessage("isInserted internal");
-	return true;
+//---------------------------------------------------------------------------------
+int sdmmc_nand_startup() {
+//---------------------------------------------------------------------------------
+    sdmmc_controller_init(false);
+    return sdmmc_nand_init();
 }
 
-
-/*-----------------------------------------------------------------
-clearStatus
-Reset the card, clearing any status errors
-return true if the card is idle and ready
------------------------------------------------------------------*/
-bool clearStatus (void) {
-	nocashMessage("clearStatus internal");
-	return true;
+//---------------------------------------------------------------------------------
+int sdmmc_sd_startup() {
+//---------------------------------------------------------------------------------
+    sdmmc_controller_init(false);
+    return sdmmc_sdcard_init();
 }
 
-
-/*-----------------------------------------------------------------
-readSectors
-Read "numSectors" 512-byte sized sectors from the card into "buffer", 
-starting at "sector". 
-The buffer may be unaligned, and the driver must deal with this correctly.
-return true if it was successful, false if it failed for any reason
------------------------------------------------------------------*/
-bool readSectors (u32 sector, u32 numSectors, void* buffer) {
-	nocashMessage("readSectors internal");
-	//dbg_printf("readSectors internal");
-	return sdmmc_sdcard_readsectors(sector,numSectors,buffer)==0;
+//---------------------------------------------------------------------------------
+int sdmmc_sdcard_readsectors(u32 sector_no, u32 numsectors, void *out) {
+//---------------------------------------------------------------------------------
+    return sdmmc_readsectors(&deviceSD, sector_no, numsectors, out);
 }
 
-
-
-/*-----------------------------------------------------------------
-writeSectors
-Write "numSectors" 512-byte sized sectors from "buffer" to the card, 
-starting at "sector".
-The buffer may be unaligned, and the driver must deal with this correctly.
-return true if it was successful, false if it failed for any reason
------------------------------------------------------------------*/
-bool writeSectors (u32 sector, u32 numSectors, void* buffer) {
-	nocashMessage("writeSectors internal");
-	//dbg_printf("writeSectors internal");
-	return sdmmc_sdcard_writesectors(sector,numSectors,buffer)==0;
+//---------------------------------------------------------------------------------
+int sdmmc_sdcard_writesectors(u32 sector_no, u32 numsectors, void *in) {
+//---------------------------------------------------------------------------------
+    return sdmmc_writesectors(&deviceSD, sector_no, numsectors, in);
 }
 
-
-/*-----------------------------------------------------------------
-shutdown
-shutdown the card, performing any needed cleanup operations
-Don't expect this function to be called before power off, 
-it is merely for disabling the card.
-return true if the card is no longer active
------------------------------------------------------------------*/
-bool shutdown(void) {
-	nocashMessage("shutdown internal");
-	return true;
+//---------------------------------------------------------------------------------
+int sdmmc_nand_readsectors(u32 sector_no, u32 numsectors, void *out) {
+//---------------------------------------------------------------------------------
+    return sdmmc_readsectors(&deviceNAND, sector_no, numsectors, out);
 }
 
-const IO_INTERFACE __myio_dsisd = {
+//---------------------------------------------------------------------------------
+int sdmmc_nand_writesectors(u32 sector_no, u32 numsectors, void *in) {
+//---------------------------------------------------------------------------------
+    return sdmmc_writesectors(&deviceNAND, sector_no, numsectors, in);
+}
+
+//---------------------------------------------------------------------------------
+int sdmmc_sd_isinserted() {
+//---------------------------------------------------------------------------------
+    return true;
+}
+
+//---------------------------------------------------------------------------------
+int sdmmc_sd_clearstatus() {
+//---------------------------------------------------------------------------------
+    return true;
+}
+
+//---------------------------------------------------------------------------------
+int sdmmc_sd_shutdown() {
+//---------------------------------------------------------------------------------
+    return true;
+}
+
+const DISC_INTERFACE __io_dsisd = {
 	DEVICE_TYPE_DSI_SD,
 	FEATURE_MEDIUM_CANREAD | FEATURE_MEDIUM_CANWRITE,
-	(FN_MEDIUM_STARTUP)&startup,
-	(FN_MEDIUM_ISINSERTED)&isInserted,
-	(FN_MEDIUM_READSECTORS)&readSectors,
-	(FN_MEDIUM_WRITESECTORS)&writeSectors,
-	(FN_MEDIUM_CLEARSTATUS)&clearStatus,
-	(FN_MEDIUM_SHUTDOWN)&shutdown
+	(FN_MEDIUM_STARTUP)&sdmmc_sd_startup,
+	(FN_MEDIUM_ISINSERTED)&sdmmc_sd_isinserted,
+	(FN_MEDIUM_READSECTORS)&sdmmc_sdcard_readsectors,
+	(FN_MEDIUM_WRITESECTORS)&sdmmc_sdcard_writesectors,
+	(FN_MEDIUM_CLEARSTATUS)&sdmmc_sd_clearstatus,
+	(FN_MEDIUM_SHUTDOWN)&sdmmc_sd_shutdown
 };
+
+const DISC_INTERFACE* get_io_dsisd (void) {
+	return &__io_dsisd;
+}
+

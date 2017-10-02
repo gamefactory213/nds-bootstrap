@@ -142,8 +142,8 @@ bool isMounted;
 
 void InitSD(){
 	fatUnmount("sd:/");
-	__io_dsisd.shutdown();
-	isMounted = fatMountSimple("sd", &__io_dsisd);  
+	get_io_dsisd()->shutdown();
+	isMounted = fatMountSimple("sd", get_io_dsisd());  
 }
 
 void initMBK() {

@@ -195,8 +195,11 @@ enum {FS_UNKNOWN, FS_FAT12, FS_FAT16, FS_FAT32} discFileSystem;
 // Global sector buffer to save on stack space
 unsigned char globalBuffer[BYTES_PER_SECTOR];
 
-#define CLUSTER_CACHE      0x3700000
-#define CLUSTER_CACHE_SIZE 0x40000
+#define CLUSTER_CACHE      0x3795000 // WRAM A
+#define CLUSTER_CACHE_SIZE 0x20000 // 128K
+
+#define ONE_CACHE  0x3785000 // WRAM A
+#define ONE_CACHE_SIZE 0x10000 // 64K
 
 static u32* lastClusterCacheUsed = (u32*) CLUSTER_CACHE;
 
@@ -311,14 +314,18 @@ bool FAT_InitFiles (bool initCard)
 	
 	if (initCard && !CARD_StartUp())
 	{
+		#ifdef DEBUG
 		nocashMessage("!CARD_StartUp()");
+		#endif
 		return (false);
 	}
 	
 	// Read first sector of card
 	if (!CARD_ReadSector (0, globalBuffer)) 
 	{
+		#ifdef DEBUG	
 		nocashMessage("!CARD_ReadSector (0, globalBuffer)");
+		#endif	
 		return false;
 	}
 	// Check if there is a FAT string, which indicates this is a boot sector
@@ -408,8 +415,10 @@ bool FAT_InitFiles (bool initCard)
 		}
 	}
 	
+	#ifdef DEBUG	
 	nocashMessage("FAT_InitFiles OK");
-
+	#endif
+		
 	return (true);
 }
 
@@ -437,7 +446,10 @@ aFile getBootFileCluster (const char* bootName)
 	// Check if fat has been initialised
 	if (discBytePerSec == 0)
 	{
+		#ifdef DEBUG	
 		nocashMessage("getBootFileCluster  fat not initialised");
+		#endif
+		
 		file.firstCluster = CLUSTER_FREE;
 		file.currentCluster = file.firstCluster;
 		file.currentOffset=0;
@@ -503,20 +515,28 @@ aFile getBootFileCluster (const char* bootName)
 	// If no file is found, return CLUSTER_FREE
 	if (notFound)
 	{
+		#ifdef DEBUG	
 		nocashMessage("getBootFileCluster  notFound");
+		#endif
+		
 		file.firstCluster = CLUSTER_FREE;
 		file.currentCluster = file.firstCluster;
 		file.currentOffset=0;
 		file.fatTableCached=false;
+		file.oneClusterCached=false;
+		
 		return file;
 	}
 	
+	#ifdef DEBUG	
 	nocashMessage("getBootFileCluster  found");
+	#endif
 	
 	file.firstCluster = (dir.startCluster | (dir.startClusterHigh << 16));
 	file.currentCluster = file.firstCluster;
 	file.currentOffset=0;
 	file.fatTableCached=false;
+	file.oneClusterCached=false;
 	return file;
 }
 
@@ -526,6 +546,7 @@ aFile getFileFromCluster (u32 cluster) {
 	file.currentCluster = file.firstCluster;
 	file.currentOffset=0;
 	file.fatTableCached=false;
+	file.oneClusterCached=false;
 	return file;	
 }
 
@@ -534,7 +555,10 @@ fileRead(buffer, cluster, startOffset, length)
 -----------------------------------------------------------------*/
 u32 fileRead (char* buffer, aFile file, u32 startOffset, u32 length)
 {
+	#ifdef DEBUG	
 	nocashMessage("fileRead");
+	#endif
+	
 	int curByte;
 	int curSect;
 	
@@ -552,87 +576,118 @@ u32 fileRead (char* buffer, aFile file, u32 startOffset, u32 length)
 		file.currentCluster = file.firstCluster;
 	}
 	
-	// Follow cluster list until desired one is found
-	for (chunks = (startOffset-file.currentOffset) / discBytePerClus; chunks > 0; chunks--)
-	{
-		file.currentCluster = FAT_NextCluster (file.currentCluster);
-		file.currentOffset+=discBytePerClus;
+	if(file.oneClusterCached && length == 512 && ((startOffset / discBytePerClus) * discBytePerClus) == file.currentOffset) {
+		// read from cache
+		curByte = startOffset % discBytePerClus;
+		fastCopy32(ONE_CACHE+curByte,buffer,length);
+		return length;	
 	}
 	
-	// Calculate the sector and byte of the current position,
-	// and store them
-	curSect = (startOffset % discBytePerClus) / BYTES_PER_SECTOR;
-	curByte = startOffset % BYTES_PER_SECTOR;
-
-	// Load sector buffer for new position in file
-	CARD_ReadSector( curSect + FAT_ClustToSect(file.currentCluster), globalBuffer);
-	curSect++;
-
-	// Number of bytes needed to read to align with a sector
-	beginBytes = (BYTES_PER_SECTOR < length + curByte ? (BYTES_PER_SECTOR - curByte) : length);
-
-	// Read first part from buffer, to align with sector boundary
-	for (dataPos = 0 ; dataPos < beginBytes; dataPos++)
-	{
-		buffer[dataPos] = globalBuffer[curByte++];
-	}
-
-	// Read in all the 512 byte chunks of the file directly, saving time
-	for ( chunks = ((int)length - beginBytes) / BYTES_PER_SECTOR; chunks > 0;)
-	{
-		int sectorsToRead;
-
-		// Move to the next cluster if necessary
-		if (curSect >= discSecPerClus)
-		{
-			curSect = 0;
-			file.currentCluster = FAT_NextCluster (file.currentCluster);
-			file.currentOffset+=discBytePerClus;
+	if(file.fatTableCached) {
+		u32 clusterIndex = startOffset/discBytePerClus;
+		file.currentCluster = file.fatTableCache[clusterIndex];
+		file.currentOffset=clusterIndex*discBytePerClus;
+	} else {	
+		if(startOffset<file.currentOffset) {
+			file.currentOffset=0;
+			file.currentCluster = file.firstCluster;
 		}
-
-		// Calculate how many sectors to read (read a maximum of discSecPerClus at a time)
-		sectorsToRead = discSecPerClus - curSect;
-		if(chunks < sectorsToRead)
-			sectorsToRead = chunks;
-
-		// Read the sectors
-		CARD_ReadSectors(curSect + FAT_ClustToSect(file.currentCluster), sectorsToRead, buffer + dataPos);
-		chunks  -= sectorsToRead;
-		curSect += sectorsToRead;
-		dataPos += BYTES_PER_SECTOR * sectorsToRead;
-	}
-
-	// Take care of any bytes left over before end of read
-	if (dataPos < length)
-	{
-
-		// Update the read buffer
-		curByte = 0;
-		if (curSect >= discSecPerClus)
-		{
-			curSect = 0;
-			file.currentCluster = FAT_NextCluster (file.currentCluster);
-			file.currentOffset+=discBytePerClus;
-		}
-		CARD_ReadSector( curSect + FAT_ClustToSect(file.currentCluster), globalBuffer);
 		
-		// Read in last partial chunk
-		for (; dataPos < length; dataPos++)
+		// Follow cluster list until desired one is found
+		for (chunks = (startOffset-file.currentOffset) / discBytePerClus; chunks > 0; chunks--)
 		{
-			buffer[dataPos] = globalBuffer[curByte];
-			curByte++;
-		}
+			file.currentCluster = FAT_NextCluster (file.currentCluster);
+			file.currentOffset+=discBytePerClus;
+		}	
 	}
 	
-	return dataPos;
+	if(file.oneClusterCached && length == 512) {		
+		// fill the cache
+		CARD_ReadSectors(FAT_ClustToSect(file.currentCluster), discSecPerClus, ONE_CACHE);		
+		// read from cache
+		curByte = startOffset % discBytePerClus;
+		fastCopy32(ONE_CACHE+curByte,buffer,length);
+		return length;	
+		
+	} else {
+		// Calculate the sector and byte of the current position,
+		// and store them
+		curSect = (startOffset % discBytePerClus) / BYTES_PER_SECTOR;
+		curByte = startOffset % BYTES_PER_SECTOR;
+
+		// Load sector buffer for new position in file
+		CARD_ReadSector( curSect + FAT_ClustToSect(file.currentCluster), globalBuffer);
+		curSect++;
+
+		// Number of bytes needed to read to align with a sector
+		beginBytes = (BYTES_PER_SECTOR < length + curByte ? (BYTES_PER_SECTOR - curByte) : length);
+
+		// Read first part from buffer, to align with sector boundary
+		for (dataPos = 0 ; dataPos < beginBytes; dataPos++)
+		{
+			buffer[dataPos] = globalBuffer[curByte++];
+		}
+
+		// Read in all the 512 byte chunks of the file directly, saving time
+		for ( chunks = ((int)length - beginBytes) / BYTES_PER_SECTOR; chunks > 0;)
+		{
+			int sectorsToRead;
+
+			// Move to the next cluster if necessary
+			if (curSect >= discSecPerClus)
+			{
+				curSect = 0;
+				file.currentCluster = FAT_NextCluster (file.currentCluster);
+				file.currentOffset+=discBytePerClus;
+			}
+
+			// Calculate how many sectors to read (read a maximum of discSecPerClus at a time)
+			sectorsToRead = discSecPerClus - curSect;
+			if(chunks < sectorsToRead)
+				sectorsToRead = chunks;
+
+			// Read the sectors
+			CARD_ReadSectors(curSect + FAT_ClustToSect(file.currentCluster), sectorsToRead, buffer + dataPos);
+			chunks  -= sectorsToRead;
+			curSect += sectorsToRead;
+			dataPos += BYTES_PER_SECTOR * sectorsToRead;
+		}
+
+		// Take care of any bytes left over before end of read
+		if (dataPos < length)
+		{
+
+			// Update the read buffer
+			curByte = 0;
+			if (curSect >= discSecPerClus)
+			{
+				curSect = 0;
+				file.currentCluster = FAT_NextCluster (file.currentCluster);
+				file.currentOffset+=discBytePerClus;
+			}
+			CARD_ReadSector( curSect + FAT_ClustToSect(file.currentCluster), globalBuffer);
+			
+			// Read in last partial chunk
+			for (; dataPos < length; dataPos++)
+			{
+				buffer[dataPos] = globalBuffer[curByte];
+				curByte++;
+			}
+		}
+		
+		return dataPos;	
+	}	
 }
 
 /*-----------------------------------------------------------------
-fileRead(buffer, cluster, startOffset, length)
+fileWrite(buffer, cluster, startOffset, length)
 -----------------------------------------------------------------*/
 u32 fileWrite (char* buffer, aFile file, u32 startOffset, u32 length)
 {
+	#ifdef DEBUG	
 	nocashMessage("fileWrite");
+	#endif
+	
 	int curByte;
 	int curSect;
 	
@@ -642,7 +697,9 @@ u32 fileWrite (char* buffer, aFile file, u32 startOffset, u32 length)
 
 	if (file.firstCluster == CLUSTER_FREE || file.firstCluster == CLUSTER_EOF) 
 	{
+		#ifdef DEBUG	
 		nocashMessage("CLUSTER_FREE or CLUSTER_EOF");
+		#endif
 		return 0;
 	}
 	
@@ -661,15 +718,14 @@ u32 fileWrite (char* buffer, aFile file, u32 startOffset, u32 length)
 		{
 			file.currentCluster = FAT_NextCluster (file.currentCluster);
 			file.currentOffset+=discBytePerClus;
-		}
-	
+		}	
 	}
 	
 	// Calculate the sector and byte of the current position,
 	// and store them
 	curSect = (startOffset % discBytePerClus) / BYTES_PER_SECTOR;
 	curByte = startOffset % BYTES_PER_SECTOR;
-
+	
 	// Load sector buffer for new position in file
 	CARD_ReadSector( curSect + FAT_ClustToSect(file.currentCluster), globalBuffer);
 
@@ -757,6 +813,7 @@ void buildFatTableCache (aFile file) {
 	
 	if(file.currentCluster == CLUSTER_EOF) {
 		file.fatTableCached = true;
+		file.oneClusterCached = false;
 	}
 	
 	file.currentOffset=0;

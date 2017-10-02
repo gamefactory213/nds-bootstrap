@@ -25,31 +25,28 @@
 
 #include "disc_io.h"
 
-// export interface
-extern IO_INTERFACE __myio_dsisd ;
-
 static inline bool CARD_StartUp (void) {
-	return __myio_dsisd.fn_startup();
+	return get_io_dsisd()->startup();
 }
 
 static inline bool CARD_IsInserted (void) {
-	return __myio_dsisd.fn_isInserted();
+	return get_io_dsisd()->isInserted();
 }
 
 static inline bool CARD_ReadSector (u32 sector, void *buffer) {
-	return __myio_dsisd.fn_readSectors(sector, 1, buffer);
+	return get_io_dsisd()->readSectors(sector, 1, buffer);
 }
 
 static inline bool CARD_ReadSectors (u32 sector, int count, void *buffer) {
-	return __myio_dsisd.fn_readSectors(sector, count, buffer);
+	return get_io_dsisd()->readSectors(sector, count, buffer);
 }
 
 static inline bool CARD_WriteSector (u32 sector, void *buffer) {
-	return __myio_dsisd.fn_writeSectors(sector, 1, buffer);
+	return get_io_dsisd()->writeSectors(sector, 1, buffer);
 }
 
 static inline bool CARD_WriteSectors (u32 sector, int count, void *buffer) {
-	return __myio_dsisd.fn_writeSectors(sector, count, buffer);
+	return get_io_dsisd()->writeSectors(sector, count, buffer);
 }
 
 #endif // CARD_H
