@@ -171,24 +171,37 @@ void initMBK() {
 
 bool consoleInited = false;
 
+extern const DISC_INTERFACE __io_dsisd;
+
+bool isMounted;
+
+void InitSD(){
+  	fatUnmount("sd:/");
+ 	__io_dsisd.shutdown();
+ 	isMounted = fatMountSimple("sd", &__io_dsisd);  
+  }
+
 int reinittimer = 0;
 bool run_reinittimer = true;
 //---------------------------------------------------------------------------------
 void VcountHandler() {
 //---------------------------------------------------------------------------------
-	if (run_reinittimer) {
-		reinittimer++;
-		if (reinittimer == 180) {
-			if(!consoleInited) {
-				consoleDemoInit();
-				consoleInited = true;
-			}
-			consoleClear();
-			nocashMessage("fatInitDefault crashed!");
-			printf("fatInitDefault crashed!");
-			run_reinittimer = false;
-		}
-	}
+    if (run_reinittimer) {
+        reinittimer++;
+        if (reinittimer == 90) {
+            InitSD();    // Re-init SD if fatInit is looping
+        }
+        if (reinittimer == 180) {
+            if(!consoleInited) {
+                consoleDemoInit();
+                consoleInited = true;
+            }
+            consoleClear();
+            nocashMessage("fatInitDefault crashed!");
+            printf("fatInitDefault crashed!");
+            run_reinittimer = false;
+        }
+    }
 }
 
 int main( int argc, char **argv) {
