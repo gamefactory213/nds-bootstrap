@@ -244,7 +244,7 @@ int main( int argc, char **argv) {
 		std::string	ndsPath = bootstrapini.GetString( "NDS-BOOTSTRAP", "NDS_PATH", "");
 		reinittimer = 0;
 
-		FILE *f_nds_file = fopen(ndsPath.c_str(), "rb");
+		/*FILE *f_nds_file = fopen(ndsPath.c_str(), "rb");
 
 		char game_TID[5];
 		fseek(f_nds_file, offsetof(sNDSHeadertitlecodeonly, gameCode), SEEK_SET);
@@ -257,7 +257,7 @@ int main( int argc, char **argv) {
 		
 		if (strcmp(game_TID, "I") != 0) {
 			disableSlot1();	// Disable Slot-1 access for games with no built-in Infrared port
-		}
+		}*/
 
 		bool run_timeout = bootstrapini.GetInt( "NDS-BOOTSTRAP", "CHECK_COMPATIBILITY", 1);
 		if (run_timeout) fifoSendValue32(FIFO_USER_04, 1);
