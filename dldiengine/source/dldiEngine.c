@@ -27,6 +27,8 @@ extern volatile IntFn* volatile irqHandler; // this pointer is not at the end of
 extern vu32* volatile irqSig; // always NULL
 extern vu32* volatile commandAddr;
 
+bool ndmaUsed = false;
+
 void sendValue32(vu32 value32) {
 	nocashMessage("sendValue32");
 	commandAddr[0] = (u32)0x027FEE08;
@@ -54,7 +56,7 @@ void sdmmcCustomValueHandler(u32 value) {
         if (sdmmc_read16(REG_SDSTATUS0) == 0) {
             result = 1;
         } else {
-            sdmmc_controller_init();
+            sdmmc_controller_init(false);
             result = sdmmc_sdcard_init();
         }
 		//FAT_InitFiles(false);

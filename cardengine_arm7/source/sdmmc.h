@@ -7,6 +7,7 @@
 
 #define SDMMC_BASE	0x04004800
 
+
 #define REG_SDCMD       0x00
 #define REG_SDPORTSEL   0x02
 #define REG_SDCMDARG    0x04
@@ -72,7 +73,6 @@
 #define TMIO_STAT1_CMD_BUSY      0x4000
 #define TMIO_STAT1_ILL_ACCESS    0x8000
 
-//Comes from TWLSDK mongoose.tef DWARF info
 #define SDMC_NORMAL              0x00000000
 #define SDMC_ERR_COMMAND         0x00000001
 #define SDMC_ERR_CRC             0x00000002
@@ -104,8 +104,6 @@
 #define TMIO_MASK_READOP  (TMIO_STAT1_RXRDY | TMIO_STAT1_DATAEND)
 #define TMIO_MASK_WRITEOP (TMIO_STAT1_TXRQ | TMIO_STAT1_DATAEND)
 
-#define DEVICE_TYPE_DSI_SD ('i') | ('_' << 8) | ('S' << 16) | ('D' << 24)
-
 typedef struct mmcdevice {
     u8* data;
     u32 size;
@@ -122,7 +120,11 @@ typedef struct mmcdevice {
     u32 res;
 } mmcdevice;
 
-void sdmmc_controller_init();
+enum {
+    MMC_DEVICE_SDCARD
+};
+
+void sdmmc_controller_init(bool force_init);
 void sdmmc_initirq();
 int sdmmc_cardinserted();
 

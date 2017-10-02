@@ -150,15 +150,6 @@ void myFIFOValue32Handler(u32 value,void* data)
 	iprintf( "ARM7 data %x\n", value );
 }
 
-
-bool isMounted;
-
-void InitSD(){
-	fatUnmount("sd:/");
-	__io_dsisd.shutdown();
-	isMounted = fatMountSimple("sd", &__io_dsisd);  
-}
-
 void initMBK() {
 	// default dsiware settings
 
@@ -187,12 +178,11 @@ void VcountHandler() {
 //---------------------------------------------------------------------------------
 	if (run_reinittimer) {
 		reinittimer++;
-		if (reinittimer == 90) {
-			InitSD();	// Re-init SD if fatInit is looping
-		}
 		if (reinittimer == 180) {
-			if(!consoleInited) consoleDemoInit();
-			consoleInited = true;
+			if(!consoleInited) {
+				consoleDemoInit();
+				consoleInited = true;
+			}
 			consoleClear();
 			nocashMessage("fatInitDefault crashed!");
 			printf("fatInitDefault crashed!");
@@ -212,16 +202,17 @@ int main( int argc, char **argv) {
 	// switch to NTR mode
 	REG_SCFG_EXT = 0x83000000; // NAND/SD Access
 
-	InitSD();
-	if (isMounted) {
-		nocashMessage("isMounted");
+	if (fatInitDefault()) {
+		nocashMessage("fatInitDefault");
 		CIniFile bootstrapini( "sd:/_nds/nds-bootstrap.ini" );
 
 		if(bootstrapini.GetInt("NDS-BOOTSTRAP","DEBUG",0) == 1) {
 			debug=true;
 
-			if(!consoleInited) consoleDemoInit();
-			consoleInited = true;
+			if(!consoleInited) {
+				consoleDemoInit();
+				consoleInited = true;
+			}
 
 			fifoSetValue32Handler(FIFO_USER_02,myFIFOValue32Handler,0);
 
@@ -337,7 +328,7 @@ int main( int argc, char **argv) {
 	} else {
 		run_reinittimer = false;
 		consoleDemoInit();
-		printf("SD init failed!\n");
+		printf("fatInitDefault failed!\n");
 	}
 
 	while(1) { swiWaitForVBlank(); }
