@@ -425,6 +425,10 @@ int main (void) {
 	// Pass command line arguments to loaded program
 	//passArgs_ARM7();
 
+	// Switch to NTR mode BIOS
+	nocashMessage("Switch to NTR mode BIOS");
+	REG_SCFG_ROM = 0x703;
+
 	nocashMessage("Start the NDS file");
 	startBinary_ARM7();
 
