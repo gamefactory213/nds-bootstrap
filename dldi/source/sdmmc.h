@@ -121,7 +121,7 @@ typedef struct mmcdevice {
     u32 res;
 } mmcdevice;
 
-void sdmmc_controller_init();
+void sdmmc_controller_init(bool force_init);
 void sdmmc_initirq();
 int sdmmc_cardinserted();
 

@@ -262,7 +262,7 @@ returns true if successful, otherwise returns false
 bool startup(void) {	
 	nocashMessage("startup");
 	if(isArm7()) {
-		sdmmc_controller_init();
+		sdmmc_controller_init(true);
 		return sdmmc_sdcard_init()==0;
 	} else {	
 		return sd_Startup();
