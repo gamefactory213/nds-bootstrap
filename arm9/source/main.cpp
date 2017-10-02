@@ -186,17 +186,17 @@ void VcountHandler() {
 //---------------------------------------------------------------------------------
 	if (run_reinittimer) {
 		reinittimer++;
-		if (reinittimer == 90) {
-			InitSD();	// Re-init SD if fatInit is looping
-		}
+		//if (reinittimer == 90) {
+		//	InitSD();	// Re-init SD if fatInit is looping
+		//}
 		if (reinittimer == 180) {
 			if(!consoleInited) {
 				consoleDemoInit();
 				consoleInited = true;
 			}
 			consoleClear();
-			nocashMessage("fatInitDefault crashed!");
-			printf("fatInitDefault crashed!");
+			nocashMessage("fatInit crashed!");
+			printf("fatInit crashed!");
 			run_reinittimer = false;
 		}
 	}
@@ -232,8 +232,8 @@ int main( int argc, char **argv) {
 			getSFCG_ARM7();
 		}
 
-		fatInitDefault();
-		nocashMessage("fatInitDefault");
+		//fatInitDefault();
+		//nocashMessage("fatInitDefault");
 		reinittimer = 0;
 
 		int romread_LED = bootstrapini.GetInt("NDS-BOOTSTRAP","ROMREAD_LED",1);
