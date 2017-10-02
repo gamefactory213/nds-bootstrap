@@ -27,6 +27,7 @@
 
 #include <nds/fifocommon.h>
 
+
 #include "nds_loader_arm9.h"
 #include "inifile.h"
 
@@ -211,7 +212,8 @@ int main( int argc, char **argv) {
 	initMBK();
 
 	// switch to NTR mode
-	//REG_SCFG_EXT = 0x83000000; // NAND/SD Access
+	REG_SCFG_EXT = 0x83000000; // NAND/SD Access
+	__NDSHeader->unitCode = 1;
 
 	//InitSD();
 	if (fatInitDefault()) {
