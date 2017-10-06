@@ -402,30 +402,12 @@ int cardRead (u32* cacheStruct) {
 		}
 		romSize -= 0x4000;
 		romSize -= ARM9_LEN;
-		
-		if(romSize > 0x00800000 && romSize <= 0x00C00000) {
-			ROM_LOCATION = 0x0D000000-romSize;
-		}
 
-		// If ROM size is 0x00C00000 or below, then load the ROM into RAM.
-		if(romSize <= 0x00C00000 && !dsiWramUsed) {
-			// read directly at arm7 level
-			commandRead = 0x025FFB08;
-
-			REG_SCFG_EXT = 0x83008000;
-
-			sharedAddr[0] = ROM_LOCATION;
-			sharedAddr[1] = romSize;
-			sharedAddr[2] = 0x4000+ARM9_LEN;
-			sharedAddr[3] = commandRead;
-			if(romSize > 0x00800000 && romSize <= 0x00C00000) sharedAddr[4] = true;
-			else sharedAddr[4] = false;
-
-			IPC_SendSync(0xEE24);
-
-			while(sharedAddr[3] != (vu32)0);
-
-			REG_SCFG_EXT = 0x83000000;
+		// If ROM size is 0x00C00000 or below, then the ROM is in RAM.
+		if(romSize <= 0x00C00000 && (ROM_TID & 0x00FFFFFF) != 0x524941 && (ROM_TID & 0x00FFFFFF) != 0x534941 && !dsiWramUsed) {
+			if(romSize > 0x00800000 && romSize <= 0x00C00000) {
+				ROM_LOCATION = 0x0D000000-romSize;
+			}
 
 			ROM_LOCATION -= 0x4000;
 			ROM_LOCATION -= ARM9_LEN;

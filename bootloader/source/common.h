@@ -36,6 +36,7 @@ enum {ARM9_BOOT, ARM9_START, ARM9_MEMCLR, ARM9_READY, ARM9_BOOTBIN, ARM9_DISPERR
 extern volatile int arm9_stateFlag;
 extern volatile u32 arm9_errorCode;
 extern volatile bool arm9_errorClearBG;
+extern volatile bool arm9_extRAM;
 
 static inline void dmaFill(const void* src, void* dest, uint32 size) {
 	DMA_SRC(3)  = (uint32)src;
