@@ -99,6 +99,7 @@ void runFile(string filename, string savPath, string arm7DonorPath, u32 useArm7D
 		dbg_printf("no nds file specified\n");
 	} else {
 		dbg_printf("Running %s with %d parameters\n", argarray[0], argarray.size());
+		powerOn(PM_BACKLIGHT_TOP);
 		int err = runNdsFile (argarray[0],
 							strdup(savPath.c_str()),
 							strdup(arm7DonorPath.c_str()),
@@ -107,6 +108,7 @@ void runFile(string filename, string savPath, string arm7DonorPath, u32 useArm7D
 							patchMpuRegion,
 							patchMpuSize,
 							argarray.size(), (const char **)&argarray[0]);
+		powerOff(PM_BACKLIGHT_TOP);
 		dbg_printf("Start failed. Error %i\n", err);
 
 	}
@@ -191,8 +193,10 @@ void VcountHandler() {
 			InitSD();	// Re-init SD if fatInit is looping
 		}
 		if (reinittimer == 180) {
-			if(!consoleInited) consoleDemoInit();
-			consoleInited = true;
+			if(!consoleInited) {
+				consoleDemoInit();
+				consoleInited = true;
+			}
 			consoleClear();
 			nocashMessage("fatInitDefault crashed!");
 			printf("fatInitDefault crashed!");
@@ -218,7 +222,11 @@ int main( int argc, char **argv) {
 		if(bootstrapini.GetInt("NDS-BOOTSTRAP","DEBUG",0) == 1) {
 			debug=true;
 
-			consoleDemoInit();
+			if(!consoleInited) {
+				powerOff(PM_BACKLIGHT_TOP);
+				consoleDemoInit();
+				consoleInited = true;
+			}
 
 			// fifoSetValue32Handler(FIFO_USER_02,myFIFOValue32Handler,0);
 
