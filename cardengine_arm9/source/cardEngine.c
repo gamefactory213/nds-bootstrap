@@ -477,7 +477,7 @@ int cardRead (u32* cacheStruct) {
 
 	u32 sector = (src/CACHE_READ_SIZE)*CACHE_READ_SIZE;
 
-	if(page == src && len > CACHE_READ_SIZE && dst < 0x02700000 && dst > 0x02000000 && ((u32)dst)%4==0) {
+	if(!ROMinRAM && page == src && len > CACHE_READ_SIZE && dst < 0x02700000 && dst > 0x02000000 && ((u32)dst)%4==0) {
 		// read directly at arm7 level
 		commandRead = 0x025FFB08;
 
