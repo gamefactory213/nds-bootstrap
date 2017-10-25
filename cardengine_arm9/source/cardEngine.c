@@ -562,6 +562,10 @@ int cardRead (u32* cacheStruct) {
 		{
 			selectedSize = 125;
 			CACHE_READ_SIZE = _192KB_READ_SIZE;
+		} else if((ROM_TID & 0x00FFFFFF) == 0x4D5341)	// Super Mario 64 DS
+		{
+			selectedSize = 12;
+			CACHE_READ_SIZE = _128KB_READ_SIZE;
 		} else {
 			if(len <= _64KB_READ_SIZE) {
 				selectedSize = 1;
