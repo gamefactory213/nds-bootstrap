@@ -23,8 +23,11 @@
 #define _32KB_READ_SIZE 0x8000
 #define _64KB_READ_SIZE 0x10000
 #define _128KB_READ_SIZE 0x20000
+#define _192KB_READ_SIZE 0x30000
 #define _256KB_READ_SIZE 0x40000
 #define _512KB_READ_SIZE 0x80000
+#define _768KB_READ_SIZE 0xC0000
+#define _1MB_READ_SIZE 0x100000
 
 #define REG_MBK_WRAM_CACHE_START	0x4004045
 #define WRAM_CACHE_ADRESS_START 0x03708000
@@ -47,8 +50,12 @@
 
 #define only_CACHE_ADRESS_START 0x0C800000
 #define only_CACHE_ADRESS_SIZE 0x800000
+#define only_128KB_CACHE_SLOTS 0x40
+#define only_192KB_CACHE_SLOTS 0x2A
 #define only_256KB_CACHE_SLOTS 0x20
 #define only_512KB_CACHE_SLOTS 0x10
+#define only_768KB_CACHE_SLOTS 0xA
+#define only_1MB_CACHE_SLOTS 0x8
 
 extern vu32* volatile cardStruct;
 //extern vu32* volatile cacheStruct;
@@ -62,6 +69,7 @@ extern u32 ROM_TID;
 
 extern u32 flagsSet;
 extern u32 ROMinRAM;
+extern u32 use12MB;
 extern u32 dsiWramUsed;
 
 static u32 WRAM_cacheDescriptor [WRAM_CACHE_SLOTS] = {0xffffffff};
@@ -74,10 +82,8 @@ static u32 _256KB_cacheDescriptor [_256KB_CACHE_SLOTS] = {0xffffffff};
 static u32 _256KB_cacheCounter [_256KB_CACHE_SLOTS];
 static u32 _512KB_cacheDescriptor [_512KB_CACHE_SLOTS] = {0xffffffff};
 static u32 _512KB_cacheCounter [_512KB_CACHE_SLOTS];
-static u32 only_256KB_cacheDescriptor [only_256KB_CACHE_SLOTS] = {0xffffffff};
-static u32 only_256KB_cacheCounter [only_256KB_CACHE_SLOTS];
-static u32 only_512KB_cacheDescriptor [only_512KB_CACHE_SLOTS] = {0xffffffff};
-static u32 only_512KB_cacheCounter [only_512KB_CACHE_SLOTS];
+static u32 only_cacheDescriptor [only_128KB_CACHE_SLOTS] = {0xffffffff};
+static u32 only_cacheCounter [only_128KB_CACHE_SLOTS];
 static u32 WRAM_accessCounter = 0;
 static u32 _64KB_accessCounter = 0;
 static u32 _128KB_accessCounter = 0;
@@ -113,6 +119,7 @@ int WRAM_allocateCacheSlot() {
 int allocateCacheSlot() {
 	int slot = 0;
 	int lowerCounter = 0;
+	int cacheSlots = 0;
 	switch(selectedSize) {
 		case 0:
 		default:
@@ -157,11 +164,34 @@ int allocateCacheSlot() {
 				}
 			}
 			break;
+		case 12:
+			lowerCounter = only_accessCounter;
+			cacheSlots = only_128KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheCounter[i]<=lowerCounter) {
+					lowerCounter = only_cacheCounter[i];
+					slot = i;
+					if(!lowerCounter) break;
+				}
+			}
+			break;
+		case 125:
+			lowerCounter = only_accessCounter;
+			cacheSlots = only_192KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheCounter[i]<=lowerCounter) {
+					lowerCounter = only_cacheCounter[i];
+					slot = i;
+					if(!lowerCounter) break;
+				}
+			}
+			break;
 		case 13:
 			lowerCounter = only_accessCounter;
-			for(int i=0; i<only_256KB_CACHE_SLOTS; i++) {
-				if(only_256KB_cacheCounter[i]<=lowerCounter) {
-					lowerCounter = only_256KB_cacheCounter[i];
+			cacheSlots = only_256KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheCounter[i]<=lowerCounter) {
+					lowerCounter = only_cacheCounter[i];
 					slot = i;
 					if(!lowerCounter) break;
 				}
@@ -169,9 +199,32 @@ int allocateCacheSlot() {
 			break;
 		case 14:
 			lowerCounter = only_accessCounter;
-			for(int i=0; i<only_512KB_CACHE_SLOTS; i++) {
-				if(only_512KB_cacheCounter[i]<=lowerCounter) {
-					lowerCounter = only_512KB_cacheCounter[i];
+			cacheSlots = only_512KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheCounter[i]<=lowerCounter) {
+					lowerCounter = only_cacheCounter[i];
+					slot = i;
+					if(!lowerCounter) break;
+				}
+			}
+			break;
+		case 15:
+			lowerCounter = only_accessCounter;
+			cacheSlots = only_768KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheCounter[i]<=lowerCounter) {
+					lowerCounter = only_cacheCounter[i];
+					slot = i;
+					if(!lowerCounter) break;
+				}
+			}
+			break;
+		case 16:
+			lowerCounter = only_accessCounter;
+			cacheSlots = only_1MB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheCounter[i]<=lowerCounter) {
+					lowerCounter = only_cacheCounter[i];
 					slot = i;
 					if(!lowerCounter) break;
 				}
@@ -191,6 +244,7 @@ int WRAM_getSlotForSector(u32 sector) {
 }
 
 int getSlotForSector(u32 sector) {
+	int cacheSlots = 0;
 	switch(selectedSize) {
 		case 0:
 		default:
@@ -223,16 +277,50 @@ int getSlotForSector(u32 sector) {
 				}
 			}
 			break;
+		case 12:
+			cacheSlots = only_128KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheDescriptor[i]==sector) {
+					return i;
+				}
+			}
+			break;
+		case 125:
+			cacheSlots = only_192KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheDescriptor[i]==sector) {
+					return i;
+				}
+			}
+			break;
 		case 13:
-			for(int i=0; i<only_256KB_CACHE_SLOTS; i++) {
-				if(only_256KB_cacheDescriptor[i]==sector) {
+			cacheSlots = only_256KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheDescriptor[i]==sector) {
 					return i;
 				}
 			}
 			break;
 		case 14:
-			for(int i=0; i<only_512KB_CACHE_SLOTS; i++) {
-				if(only_512KB_cacheDescriptor[i]==sector) {
+			cacheSlots = only_512KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheDescriptor[i]==sector) {
+					return i;
+				}
+			}
+			break;
+		case 15:
+			cacheSlots = only_768KB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheDescriptor[i]==sector) {
+					return i;
+				}
+			}
+			break;
+		case 16:
+			cacheSlots = only_1MB_CACHE_SLOTS;
+			for(int i=0; i<cacheSlots; i++) {
+				if(only_cacheDescriptor[i]==sector) {
 					return i;
 				}
 			}
@@ -263,11 +351,23 @@ vu8* getCacheAddress(int slot) {
 		case 4:
 			return (vu32*)(_512KB_CACHE_ADRESS_START+slot*_512KB_READ_SIZE);
 			break;
+		case 12:
+			return (vu32*)(only_CACHE_ADRESS_START+slot*_128KB_READ_SIZE);
+			break;
+		case 125:
+			return (vu32*)(only_CACHE_ADRESS_START+slot*_192KB_READ_SIZE);
+			break;
 		case 13:
 			return (vu32*)(only_CACHE_ADRESS_START+slot*_256KB_READ_SIZE);
 			break;
 		case 14:
 			return (vu32*)(only_CACHE_ADRESS_START+slot*_512KB_READ_SIZE);
+			break;
+		case 15:
+			return (vu32*)(only_CACHE_ADRESS_START+slot*_768KB_READ_SIZE);
+			break;
+		case 16:
+			return (vu32*)(only_CACHE_ADRESS_START+slot*_1MB_READ_SIZE);
 			break;
 	}
 }
@@ -306,13 +406,14 @@ void updateDescriptor(int slot, u32 sector) {
 			_512KB_cacheDescriptor[slot] = sector;
 			_512KB_cacheCounter[slot] = _512KB_accessCounter;
 			break;
+		case 12:
+		case 125:
 		case 13:
-			only_256KB_cacheDescriptor[slot] = sector;
-			only_256KB_cacheCounter[slot] = only_accessCounter;
-			break;
 		case 14:
-			only_512KB_cacheDescriptor[slot] = sector;
-			only_512KB_cacheCounter[slot] = only_accessCounter;
+		case 15:
+		case 16:
+			only_cacheDescriptor[slot] = sector;
+			only_cacheCounter[slot] = only_accessCounter;
 			break;
 	}
 }
@@ -334,8 +435,12 @@ void accessCounterIncrease() {
 		case 4:
 			_512KB_accessCounter++;
 			break;
+		case 12:
+		case 125:
 		case 13:
 		case 14:
+		case 15:
+		case 16:
 			only_accessCounter++;
 			break;
 	}
@@ -379,7 +484,6 @@ int cardRead (u32* cacheStruct) {
 		}
 
 		if((ROM_TID & 0x00FFFFFF) == 0x5A3642	// MegaMan Zero Collection
-		|| (ROM_TID & 0x00FFFFFF) == 0x494B42	// Zelda: Spirit Tracks
 		|| (ROM_TID & 0x00FFFFFF) == 0x583642	// Rockman EXE: Operation Shooting Star
 		|| (ROM_TID & 0x00FFFFFF) == 0x323343)	// Ace Attorney Investigations: Miles Edgeworth
 		{
@@ -406,6 +510,7 @@ int cardRead (u32* cacheStruct) {
 		// If ROM size is 0x00C00000 or below, then the ROM is in RAM.
 		if(romSize <= 0x00C00000 && (ROM_TID & 0x00FFFFFF) != 0x524941 && (ROM_TID & 0x00FFFFFF) != 0x534941 && !dsiWramUsed) {
 			if(romSize > 0x00800000 && romSize <= 0x00C00000) {
+				use12MB = true;
 				ROM_LOCATION = 0x0D000000-romSize;
 			}
 
@@ -437,20 +542,26 @@ int cardRead (u32* cacheStruct) {
 	selectedSize = 4;
 	u32 CACHE_READ_SIZE = _512KB_READ_SIZE;
 	if(!dsiWramUsed) {
-		if((ROM_TID & 0x00FFFFFF) == 0x593341
-		|| (ROM_TID & 0x00FFFFFF) == 0x414441	// Diamond
-		|| (ROM_TID & 0x00FFFFFF) == 0x415041	// Pearl
-		|| (ROM_TID & 0x00FFFFFF) == 0x555043	// Platinum
-		|| (ROM_TID & 0x00FFFFFF) == 0x4B5049	// HG
-		|| (ROM_TID & 0x00FFFFFF) == 0x475049)	// SS
+		if((ROM_TID & 0x00FFFFFF) == 0x414441	// PKMN Diamond
+		|| (ROM_TID & 0x00FFFFFF) == 0x415041	// PKMN Pearl
+		|| (ROM_TID & 0x00FFFFFF) == 0x555043	// PKMN Platinum
+		|| (ROM_TID & 0x00FFFFFF) == 0x4B5049	// PKMN HG
+		|| (ROM_TID & 0x00FFFFFF) == 0x475049)	// PKMN SS
 		{
 			selectedSize = 14;
-		} else if((ROM_TID & 0x00FFFFFF) == 0x4D5241) {
+		} else if((ROM_TID & 0x00FFFFFF) == 0x593341)	// Sonic Rush Adventure
+		{
+			selectedSize = 16;
+			CACHE_READ_SIZE = _1MB_READ_SIZE;
+		} else if((ROM_TID & 0x00FFFFFF) == 0x4D5241	// Mario & Luigi: Partners in Time
+				|| (ROM_TID & 0x00FFFFFF) == 0x575941)	// Yoshi's Island DS
+		{
 			selectedSize = 13;
 			CACHE_READ_SIZE = _256KB_READ_SIZE;
-		} else if((ROM_TID & 0x00FFFFFF) == 0x4B4C41) {
-			selectedSize = 12;
-			CACHE_READ_SIZE = _128KB_READ_SIZE;
+		} else if((ROM_TID & 0x00FFFFFF) == 0x4B4C41)	// Lunar Knights
+		{
+			selectedSize = 125;
+			CACHE_READ_SIZE = _192KB_READ_SIZE;
 		} else {
 			if(len <= _64KB_READ_SIZE) {
 				selectedSize = 1;
@@ -493,8 +604,6 @@ int cardRead (u32* cacheStruct) {
 		while(sharedAddr[3] != (vu32)0);
 
 	} else {
-		// Prevent writing above DS 4MB RAM area
-		if(dst >= 0x02400000 && dst < 0x02800000) dst -= 0x00400000;
 		// read via the main RAM cache
 		while(len > 0) {
 			if(!ROMinRAM) {
@@ -621,6 +730,11 @@ int cardRead (u32* cacheStruct) {
 					else accessCounterIncrease();
 				}
 			} else {
+				// Prevent overwriting ROM in RAM
+				if(use12MB && dst >= 0x02400000 && dst < 0x02800000) {
+					dst -= 0x00400000;
+				}
+
 				u32 len2=len;
 				if(len2 > 512) {
 					len2 -= src%4;

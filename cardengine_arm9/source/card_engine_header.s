@@ -18,6 +18,7 @@
 .global ROM_TID
 .global flagsSet
 .global ROMinRAM
+.global use12MB
 .global dsiWramUsed
 
 #define ICACHE_SIZE	0x2000
@@ -47,6 +48,8 @@ ROM_TID:
 flagsSet:
 	.word	0x00000000
 ROMinRAM:
+	.word	0x00000000
+use12MB:
 	.word	0x00000000
 dsiWramUsed:
 	.word	0x00000000

@@ -329,15 +329,17 @@ int main(void) {
 	}
 
 	if(fifoCheckValue32(FIFO_USER_04)) {
-		i2cWriteRegister(0x4A, 0x73, 0x01);		// Set to run comptibility check
+		i2cWriteRegister(0x4A, 0x73, 0x01);		// Set to run compatibility check
 	}
 
 	if(fifoCheckValue32(FIFO_USER_02)) {
-		i2cWriteRegister(0x4A, 0x74, 0x01);	
+		i2cWriteRegister(0x4A, 0x74, 0x01);		// Set to use Camera LED as card read indicator
 		NDSTouchscreenMode();
 		*(u16*)(0x4000500) = 0x807F;
 		*(u16*)(0x4004700) = 0x800F;
 	}
+
+	SCFGFifoCheck();
 	//
 	fifoSendValue32(FIFO_USER_05, 1);
 
@@ -345,7 +347,6 @@ int main(void) {
 
 	// Keep the ARM7 mostly idle
 	while (1) {
-		SCFGFifoCheck();
 		swiWaitForVBlank();
 	}
 }
