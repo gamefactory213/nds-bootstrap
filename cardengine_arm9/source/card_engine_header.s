@@ -16,6 +16,8 @@
 .global saveCluster
 .global ROM_LOCATION
 .global ROM_TID
+.global romSize
+.global romSize_lastHalf
 .global flagsSet
 .global ROMinRAM
 .global use12MB
@@ -44,6 +46,10 @@ cacheStruct:
 ROM_LOCATION:
 	.word	0x0C800000
 ROM_TID:
+	.word	0x00000000
+romSize:
+	.word	0x00000000
+romSize_lastHalf:
 	.word	0x00000000
 flagsSet:
 	.word	0x00000000
