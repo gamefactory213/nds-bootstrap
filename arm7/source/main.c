@@ -30,15 +30,25 @@ redistribute it freely, subject to the following restrictions:
 #include <nds.h>
 
 #include <nds/ndstypes.h>
+#include <nds/arm7/sdmmc.h>
 
 #include "fifocheck.h"
 
 static vu32 * wordCommandAddr;
 
+int reinittimer = 0;
+bool run_reinittimer = true;
 //---------------------------------------------------------------------------------
 void VcountHandler() {
 //---------------------------------------------------------------------------------
-	inputGetAndSend();
+	if (run_reinittimer) {
+		reinittimer++;
+		if (reinittimer == 90) {
+			// force the sdmmc controller reinitialisation if the sdmmc init is stuck
+			sdmmc_controller_init(true);
+		}
+	}
+	inputGetAndSend();	
 }
 
 
@@ -141,7 +151,11 @@ int main(void) {
 	wordCommandAddr[1] = 0;
 	wordCommandAddr[0] = (vu32)0x027FEE08;
 
+    // wait for arm9 sucessfull init signal
 	fifoWaitValue32(FIFO_USER_03);
+	// arm9 is alive do not reinit sdmmc
+	run_reinittimer =false;
+	
 	//
 	int romread_LED = fifoGetValue32(FIFO_DSWIFI);
 	if(romread_LED == 1) {

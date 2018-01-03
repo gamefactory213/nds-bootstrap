@@ -187,9 +187,9 @@ void VcountHandler() {
 //---------------------------------------------------------------------------------
 	if (run_reinittimer) {
 		reinittimer++;
-		//if (reinittimer == 90) {
-		//	InitSD();	// Re-init SD if fatInit is looping
-		//}
+		if (reinittimer == 110) {
+			InitSD();	// Re-init SD if fatInit is looping
+		}
 		if (reinittimer == 60*5) {
 			if(!consoleInited) {
 				consoleDemoInit();
