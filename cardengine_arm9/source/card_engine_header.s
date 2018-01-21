@@ -30,7 +30,7 @@ sdk_version:
 	.word	0x00000000
 fileCluster:
 	.word	0x00000000
-cardStruct:
+cardStruct0:
 	.word	0x00000000
 cacheStruct:
 	.word	0x00000000
@@ -56,6 +56,26 @@ loop_fastCopy32:
 	ldmfd   sp!, {r3-r11,lr}
     bx      lr
 
+.global copy8
+.type   copy8 STT_FUNC
+@ r0 : src, r1 : dst, r2 : len
+copy8:
+    stmfd   sp!, {r3-r11,lr}
+        @ copy r2 bytes
+        mov     r10, r0
+        mov     r9, r1
+        mov     r8, r2
+loop_copy8:
+        ldrb   r0,[r10]
+        strb   r0,[r9]
+	add r10,r10,#1
+	add r9,r9,#1
+        subs    r8, r8, #1
+        bgt     loop_copy8
+        ldmfd   sp!, {r3-r11,lr}
+    bx      lr
+
+
 card_engine_end:
 
 .global readCachedRef
@@ -80,11 +100,11 @@ card_read_arm9:
     stmfd   sp!, {r4-r11,lr}
 		
 	@ get back the WRAM C (last slot) to arm9    
-	ldr     R3,=0x4004000 	
-	MOV     R2, #0xFFFFFF80	
-	STRB    R2, [R3,#0x53]
+	ldr     R6,=0x4004000 	
+	MOV     R5, #0xFFFFFF80	
+	STRB    R5, [R6,#0x53]
 	
-	ldr		r3, =cardRead
+	ldr		r6, =cardRead
 	
 	@ldr     r1, =0xE92D4FF0
 @wait_for_wram_card_read:
@@ -97,7 +117,7 @@ card_read_arm9:
     ldmfd   sp!, {r4-r11,lr}
     bx      lr
 _blx_r3_stub_card_read:
-	bx	r3	
+	bx	r6	
 .pool	
 cardStructArm9:
 .word    0x00000000     
