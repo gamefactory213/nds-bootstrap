@@ -42,10 +42,13 @@
 volatile int arm9_stateFlag = ARM9_BOOT;
 volatile u32 arm9_BLANK_RAM = 0;
 volatile bool arm9_errorColor = false;
+volatile int arm9_screenMode = 0;	// 0 = Regular, 1 = Pong, 2 = Tic-Tac-Toe
 volatile bool arm9_extRAM = false;
 volatile u32 arm9_SCFG_EXT = 0;
 volatile int arm9_loadBarLength = 0;
 volatile bool arm9_animateLoadingCircle = false;
+
+static bool displayScreen = false;
 
 static int loadingCircleFrame = 0;
 static bool drawnStuff = false;
@@ -59,7 +62,7 @@ static u16 colour6;
 static u16 colour7;
 static u16 colour8;
 
-static int i, y, k;
+static int e, i, y, k;
 
 /*-------------------------------------------------------------------------
 External functions
@@ -73,7 +76,7 @@ Written by Chishm.
 Modified by Robz8:
  * Replace dots with brand new loading screen (original image made by Uupo03)
 --------------------------------------------------------------------------*/
-static void arm9_errorOutput (void) {
+static void arm9_regularLoadingScreen (void) {
 	if(!drawnStuff) {
 		REG_POWERCNT = (u16)(POWER_LCD | POWER_2D_A);
 		REG_DISPCNT = MODE_FB0;
@@ -668,6 +671,353 @@ static void arm9_errorText (void) {
 	}
 
 	arm9_animateLoadingCircle = false;
+	displayScreen = false;
+}
+
+static int leftpaddle_yPos = 76;
+static int rightpaddle_yPos = 76;
+static int ball_xPos = 16;
+static int ball_yPos = 72;
+static int ball_ySpeed = 2;
+static int ball_moveUD = false;	// false = up, true = down
+static int ball_moveLR = true;	// false = left, true = right
+
+static u16 pong_color = 0x0000;
+
+static void arm9_pong (void) {
+	if(!drawnStuff) {
+		REG_POWERCNT = (u16)(POWER_LCD | POWER_2D_A);
+		REG_DISPCNT = MODE_FB0;
+		VRAM_A_CR = VRAM_ENABLE;
+
+		// Draw white BG
+		for (i = 0; i < 256*192; i++) {
+			VRAM_A[i] = 0x7FFF;
+		}
+
+		drawnStuff = true;
+	}
+	
+	if(arm9_errorColor) pong_color = 0x001B;
+
+	while(REG_VCOUNT!=191);	// fix speed
+	
+	rightpaddle_yPos = ball_yPos-16;
+	if(rightpaddle_yPos <= 0) rightpaddle_yPos = 0;
+	if(rightpaddle_yPos >= 156) rightpaddle_yPos = 156;
+
+	// Draw ball (back)
+	for (y = ball_yPos-16; y <= ball_yPos+24; y++) {
+		for (k = ball_xPos-2; k <= ball_xPos+10; k++) {
+			VRAM_A[y*256+k] = 0x7FFF;
+		}
+	}
+
+	// Draw left paddle (back)
+	for (y = leftpaddle_yPos-4; y <= leftpaddle_yPos+36; y++) {
+		for (k = 8; k <= 16; k++) {
+			VRAM_A[y*256+k] = 0x7FFF;
+		}
+	}
+
+	// Draw right paddle (back)
+	for (y = rightpaddle_yPos-16; y <= rightpaddle_yPos+48; y++) {
+		for (k = 240; k <= 248; k++) {
+			VRAM_A[y*256+k] = 0x7FFF;
+		}
+	}
+
+	// Draw ball
+	for (y = ball_yPos; y <= ball_yPos+8; y++) {
+		for (k = ball_xPos; k <= ball_xPos+8; k++) {
+			VRAM_A[y*256+k] = pong_color;
+		}
+	}
+
+	// Draw left paddle
+	for (y = leftpaddle_yPos; y <= leftpaddle_yPos+32; y++) {
+		for (k = 8; k <= 16; k++) {
+			VRAM_A[y*256+k] = pong_color;
+		}
+	}
+
+	// Draw right paddle
+	for (y = rightpaddle_yPos; y <= rightpaddle_yPos+32; y++) {
+		for (k = 240; k <= 248; k++) {
+			VRAM_A[y*256+k] = pong_color;
+		}
+	}
+
+	if(ball_moveUD==false) {
+		ball_yPos -= ball_ySpeed;
+		if(ball_yPos <= 0) ball_moveUD = true;
+	} else if(ball_moveUD==true) {
+		ball_yPos += ball_ySpeed;
+		if(ball_yPos >= 184) ball_moveUD = false;
+	}
+
+	if(ball_moveLR==false) {
+		ball_xPos -= 2;
+		if((ball_yPos > leftpaddle_yPos-8) && (ball_yPos < leftpaddle_yPos+32)) {
+			if(ball_xPos == 16) {
+				ball_moveLR = true;
+				if(ball_ySpeed != 6) {
+					ball_ySpeed++;	// Increase Y speed of ball
+				}
+			}
+		} else {
+			if(ball_xPos <= 0) {
+				// Restart minigame
+				for (i = 0; i < 256*192; i++) {
+					VRAM_A[i] = 0x7FFF;
+				}
+				leftpaddle_yPos = 76;
+				rightpaddle_yPos = 76;
+				ball_xPos = 16;
+				ball_yPos = 64;
+				ball_ySpeed = 2;
+				ball_moveUD = false;	// false = up, true = down
+				ball_moveLR = true;	// false = left, true = right
+			}
+		}
+	} else if(ball_moveLR==true) {
+		ball_xPos += 2;
+		if(ball_xPos == 236) {
+			ball_moveLR = false;
+			if(ball_ySpeed != 6) {
+				ball_ySpeed++;	// Increase Y speed of ball
+			}
+		}
+	}
+
+	// Control left paddle
+	if(REG_KEYINPUT & (KEY_UP)) {} else {
+		leftpaddle_yPos -= 4;
+		if(leftpaddle_yPos <= 0) leftpaddle_yPos = 0;
+	}
+	if(REG_KEYINPUT & (KEY_DOWN)) {} else {
+		leftpaddle_yPos += 4;
+		if(leftpaddle_yPos >= 156) leftpaddle_yPos = 156;
+	}
+
+	// Control right paddle
+	/*if(REG_KEYINPUT & (KEY_X)) {} else {
+		rightpaddle_yPos--;
+		if(rightpaddle_yPos <= 0) rightpaddle_yPos = 0;
+	}
+	if(REG_KEYINPUT & (KEY_B)) {} else {
+		rightpaddle_yPos++;
+		if(rightpaddle_yPos >= 156) rightpaddle_yPos = 156;
+	}*/
+
+}
+
+static int ttt_selected[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};	// 0 = Blank, 1 = N, 2 = T
+static int ttt_highlighted = 0;
+
+static u16 ttt_rectColor[9] = {0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF, 0x7FFF};
+
+static u16 ttt_selColor = 0x03A0;
+
+//static bool ttt_keypressed = false;
+
+static void arm9_ttt (void) {
+	if(!drawnStuff) {
+		REG_POWERCNT = (u16)(POWER_LCD | POWER_2D_A);
+		REG_DISPCNT = MODE_FB0;
+		VRAM_A_CR = VRAM_ENABLE;
+
+		// Draw white BG
+		for (i = 0; i < 256*192; i++) {
+			VRAM_A[i] = 0x7FFF;
+		}
+
+		// Draw top of v line 1
+		for (y = 56; y <= 59; y++) {
+			for (k = 0; k <= 256; k++) {
+				VRAM_A[y*256+k] = 0x4631;
+			}
+		}
+
+		// Draw v line 1
+		for (y = 60; y <= 67; y++) {
+			for (k = 0; k <= 256; k++) {
+				VRAM_A[y*256+k] = 0x0000;
+			}
+		}
+
+		// Draw v line 2
+		for (y = 124; y <= 131; y++) {
+			for (k = 0; k <= 256; k++) {
+				VRAM_A[y*256+k] = 0x0000;
+			}
+		}
+
+		// Draw bottom of v line 2
+		for (y = 132; y <= 135; y++) {
+			for (k = 0; k <= 256; k++) {
+				VRAM_A[y*256+k] = 0x4631;
+			}
+		}
+
+		// Draw h line 1
+		for (y = 0; y <= 191; y++) {
+			for (k = 80; k <= 87; k++) {
+				VRAM_A[y*256+k] = 0x0000;
+			}
+		}
+
+		// Draw h line 2
+		for (y = 0; y <= 191; y++) {
+			for (k = 168; k <= 175; k++) {
+				VRAM_A[y*256+k] = 0x0000;
+			}
+		}
+
+		drawnStuff = true;
+	}
+	
+	if(arm9_errorColor) ttt_selColor = 0x001B;
+	
+	// Draw highlighter, vertical line 1
+	for (e = 0; e <= 2; e++) {
+		// Vertical parts
+		for (y = 0; y <= 7; y++) {
+			for (k = 0; k <= 79; k++) {
+				VRAM_A[y*256+k+e*88] = ttt_rectColor[e];
+			}
+		}
+		for (y = 48; y <= 55; y++) {
+			for (k = 0; k <= 79; k++) {
+				VRAM_A[y*256+k+e*88] = ttt_rectColor[e];
+			}
+		}
+		// Horizontal parts
+		for (i = 0; i <= 72; i += 72) {
+			for (y = 8; y <= 47; y++) {
+				for (k = 0; k <= 7; k++) {
+					VRAM_A[y*256+k+i+e*88] = ttt_rectColor[e];
+				}
+			}
+		}
+	}
+
+	// Draw highlighter, vertical line 2
+	for (e = 0; e <= 2; e++) {
+		// Vertical parts
+		for (y = 68; y <= 75; y++) {
+			for (k = 0; k <= 79; k++) {
+				VRAM_A[y*256+k+e*88] = ttt_rectColor[e+3];
+			}
+		}
+		for (y = 116; y <= 123; y++) {
+			for (k = 0; k <= 79; k++) {
+				VRAM_A[y*256+k+e*88] = ttt_rectColor[e+3];
+			}
+		}
+		// Horizontal parts
+		for (i = 0; i <= 72; i += 72) {
+			for (y = 76; y <= 115; y++) {
+				for (k = 0; k <= 7; k++) {
+					VRAM_A[y*256+k+i+e*88] = ttt_rectColor[e+3];
+				}
+			}
+		}
+	}
+
+	// Draw highlighter, vertical line 3
+	for (e = 0; e <= 2; e++) {
+		// Vertical parts
+		for (y = 136; y <= 143; y++) {
+			for (k = 0; k <= 79; k++) {
+				VRAM_A[y*256+k+e*88] = ttt_rectColor[e+6];
+			}
+		}
+		for (y = 184; y <= 191; y++) {
+			for (k = 0; k <= 79; k++) {
+				VRAM_A[y*256+k+e*88] = ttt_rectColor[e+6];
+			}
+		}
+		// Horizontal parts
+		for (i = 0; i <= 72; i += 72) {
+			for (y = 144; y <= 183; y++) {
+				for (k = 0; k <= 7; k++) {
+					VRAM_A[y*256+k+i+e*88] = ttt_rectColor[e+6];
+				}
+			}
+		}
+	}
+
+	while(REG_VCOUNT!=191);	// fix speed
+
+	// Control highlighter
+	if(REG_KEYINPUT & (KEY_UP)) {} else {
+		ttt_highlighted -= 3;
+		if(ttt_highlighted < 0) ttt_highlighted = 0;
+		//ttt_keypressed = true;
+	}
+	if(REG_KEYINPUT & (KEY_DOWN)) {} else {
+		ttt_highlighted += 3;
+		if(ttt_highlighted > 8) ttt_highlighted = 8;
+		//ttt_keypressed = true;
+	}
+	if(REG_KEYINPUT & (KEY_LEFT)) {} else {
+		ttt_highlighted--;
+		if(ttt_highlighted < 0) ttt_highlighted = 0;
+		//ttt_keypressed = true;
+	}
+	if(REG_KEYINPUT & (KEY_RIGHT)) {} else {
+		ttt_highlighted++;
+		if(ttt_highlighted > 8) ttt_highlighted = 8;
+		//ttt_keypressed = true;
+	}
+
+	if(ttt_highlighted == 0) {
+		ttt_rectColor[0] = ttt_selColor;
+	} else {
+		ttt_rectColor[0] = 0x7FFF;
+	}
+	if(ttt_highlighted == 1) {
+		ttt_rectColor[1] = ttt_selColor;
+	} else {
+		ttt_rectColor[1] = 0x7FFF;
+	}
+	if(ttt_highlighted == 2) {
+		ttt_rectColor[2] = ttt_selColor;
+	} else {
+		ttt_rectColor[2] = 0x7FFF;
+	}
+	if(ttt_highlighted == 3) {
+		ttt_rectColor[3] = ttt_selColor;
+	} else {
+		ttt_rectColor[3] = 0x7FFF;
+	}
+	if(ttt_highlighted == 4) {
+		ttt_rectColor[4] = ttt_selColor;
+	} else {
+		ttt_rectColor[4] = 0x7FFF;
+	}
+	if(ttt_highlighted == 5) {
+		ttt_rectColor[5] = ttt_selColor;
+	} else {
+		ttt_rectColor[5] = 0x7FFF;
+	}
+	if(ttt_highlighted == 6) {
+		ttt_rectColor[6] = ttt_selColor;
+	} else {
+		ttt_rectColor[6] = 0x7FFF;
+	}
+	if(ttt_highlighted == 7) {
+		ttt_rectColor[7] = ttt_selColor;
+	} else {
+		ttt_rectColor[7] = 0x7FFF;
+	}
+	if(ttt_highlighted == 8) {
+		ttt_rectColor[8] = ttt_selColor;
+	} else {
+		ttt_rectColor[8] = 0x7FFF;
+	}
+	
 }
 
 /*-------------------------------------------------------------------------
@@ -767,22 +1117,27 @@ void arm9_main (void)
 	// set ARM9 state to ready and wait for it to change again
 	arm9_stateFlag = ARM9_READY;
 	while ( arm9_stateFlag != ARM9_BOOTBIN ) {
-		if(arm9_extRAM) {
-			REG_SCFG_EXT = 0x83008000;
-		} else {
-			REG_SCFG_EXT = 0x83008000;
-		}
+		REG_SCFG_EXT = 0x83008000;
 		*(u32*)(0x23ffc40) = 01;
 		*(u32*)(0x2fffc40) = 01;
 		arm9_SCFG_EXT = REG_SCFG_EXT;
 		if (arm9_stateFlag == ARM9_DISPERR) {
-			arm9_errorOutput();
-			if(arm9_errorColor) arm9_errorText();
+			displayScreen = true;
 			if ( arm9_stateFlag == ARM9_DISPERR) {
 				arm9_stateFlag = ARM9_READY;
 			}
 		}
-		if(arm9_animateLoadingCircle) arm9_loadingCircle();
+		if(displayScreen) {
+			if(arm9_screenMode == 2) {
+				arm9_ttt();
+			} else if(arm9_screenMode == 1) {
+				arm9_pong();
+			} else {
+				arm9_regularLoadingScreen();
+				if(arm9_errorColor) arm9_errorText();
+				if(arm9_animateLoadingCircle) arm9_loadingCircle();
+			}
+		}
 	}
 
 	//REG_IME=0;

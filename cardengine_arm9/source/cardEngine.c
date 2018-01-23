@@ -22,7 +22,6 @@
 
 #include "databwlist.h"
 
-static u32 ROM_LOCATION = 0x0C800000;
 static u32 ROM_TID;
 static u32 ARM9_LEN;
 static u32 romSize;
@@ -49,19 +48,19 @@ static u32 romSize;
 #define _256KB_CACHE_ADRESS_SIZE 0x200000
 #define _256KB_CACHE_SLOTS 0x8
 #define _512KB_CACHE_ADRESS_START 0x0CC00000
-#define _512KB_CACHE_ADRESS_SIZE 0x400000
-#define _512KB_CACHE_SLOTS 0x8
+#define _512KB_CACHE_ADRESS_SIZE 0x380000
+#define _512KB_CACHE_SLOTS 0x7
 
 #define only_CACHE_ADRESS_START 0x0C800000
-#define only_CACHE_ADRESS_SIZE 0x800000
-#define only_128KB_CACHE_SLOTS 0x40
-#define only_192KB_CACHE_SLOTS 0x2A
-#define only_256KB_CACHE_SLOTS 0x20
-#define only_512KB_CACHE_SLOTS 0x10
-#define only_768KB_CACHE_SLOTS 0xA
-#define only_1MB_CACHE_SLOTS 0x8
+#define only_CACHE_ADRESS_SIZE 0x7E0000
+#define only_128KB_CACHE_SLOTS 0x3F
+#define only_192KB_CACHE_SLOTS 0x29
+#define only_256KB_CACHE_SLOTS 0x1F
+#define only_512KB_CACHE_SLOTS 0xF
+#define only_768KB_CACHE_SLOTS 0x9
+#define only_1MB_CACHE_SLOTS 0x7
 
-vu32* volatile cardStruct = 0x27FFBC0;
+vu32* volatile cardStruct = 0x3707BC0;
 //extern vu32* volatile cacheStruct;
 extern u32 sdk_version;
 extern u32 needFlushDCCache;
@@ -332,20 +331,14 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 		ROM_TID = tempNdsHeader[0x00C>>2];
 		u32 ROM_HEADERCRC = tempNdsHeader[0x15C>>2];
 
-		// ExceptionHandler2 (red screen) blacklist
-		if((ROM_TID & 0x00FFFFFF) != 0x4D5341	// SM64DS
-		&& (ROM_TID & 0x00FFFFFF) != 0x443241	// NSMB
-		&& (ROM_TID & 0x00FFFFFF) != 0x4D4441)	// AC:WW
-		{
-			setExceptionHandler2();
-		}
+		setExceptionHandler2();
 
-		if((ROM_TID & 0x00FFFFFF) == 0x5A3642	// MegaMan Zero Collection
-		|| (ROM_TID & 0x00FFFFFF) == 0x583642	// Rockman EXE: Operation Shooting Star
-		|| (ROM_TID & 0x00FFFFFF) == 0x323343)	// Ace Attorney Investigations: Miles Edgeworth
-		{
+		//if((ROM_TID & 0x00FFFFFF) == 0x5A3642	// MegaMan Zero Collection
+		//|| (ROM_TID & 0x00FFFFFF) == 0x583642	// Rockman EXE: Operation Shooting Star
+		//|| (ROM_TID & 0x00FFFFFF) == 0x323343)	// Ace Attorney Investigations: Miles Edgeworth
+		//{
 			dsiWramUsed = true;
-		}
+		//}
 
 		ARM9_LEN = tempNdsHeader[0x02C>>2];
 		// Check ROM size in ROM header...
@@ -364,57 +357,6 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 		romSize -= 0x4000;
 		romSize -= ARM9_LEN;
 
-		// If ROM size is 0x00C00000 or below, then the ROM is in RAM.
-		if((romSize > 0) && (romSize <= 0x00C00000)
-		&& (ROM_TID & 0x00FFFFFF) != 0x524941 && (ROM_TID & 0x00FFFFFF) != 0x534941 && !dsiWramUsed) {
-			if(romSize > 0x00800000 && romSize <= 0x00C00000) {
-				use12MB = 1;
-				ROM_LOCATION = 0x0D000000-romSize;
-			}
-
-			ROM_LOCATION -= 0x4000;
-			ROM_LOCATION -= ARM9_LEN;
-
-			ROMinRAM = 1;
-		} else {
-			if((ROM_TID == 0x45543541) && (ROM_HEADERCRC == 0x161CCF56)) {		// MegaMan Battle Network 5: Double Team DS (U)
-				for(int i = 0; i < 3; i++)
-					setDataBWlist[i] = dataWhitelist_A5TE0[i];
-
-				GAME_CACHE_ADRESS_START = 0x0C900000;
-				GAME_CACHE_SLOTS = 0x1C;
-				GAME_READ_SIZE = _256KB_READ_SIZE;
-
-				ROMinRAM = 2;
-				whitelist = true;
-			} /*else if((ROM_TID == 0x45495941) && (ROM_HEADERCRC == 0x3ACCCF56)) {	// Yoshi Touch & Go (U)
-				for(int i = 0; i < 3; i++)
-					setDataBWlist[i] = dataBlacklist_AYIE0[i];
-
-				ROM_LOCATION -= 0x4000;
-				ROM_LOCATION -= ARM9_LEN;
-
-				GAME_CACHE_ADRESS_START = 0x0CCE0000;
-				GAME_CACHE_SLOTS = 0x19;
-				GAME_READ_SIZE = _128KB_READ_SIZE;
-
-				ROMinRAM = 2;
-			} else if((ROM_TID == 0x45525741) && (ROM_HEADERCRC == 0xB586CF56)) {	// Advance Wars: Dual Strike (U)
-				for(int i = 0; i < 3; i++)
-					setDataBWlist[i] = dataBlacklist_AWRE0[i];
-
-				ROM_LOCATION = 0x0C400000;
-				ROM_LOCATION -= 0x4000;
-				ROM_LOCATION -= ARM9_LEN;
-
-				GAME_CACHE_ADRESS_START = 0x0CBC0000;
-				GAME_CACHE_SLOTS = 0x11;
-				GAME_READ_SIZE = _256KB_READ_SIZE;
-
-				ROMinRAM = 2;
-				use12MB = 1;
-			} */
-		}
 		flagsSet = true;
 	}
 
@@ -437,31 +379,7 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 	
 	if(!dsiWramUsed) {
 		if(!cacheSizeSet && ROMinRAM==0) {
-			if((ROM_TID & 0x00FFFFFF) == 0x593341)	// Sonic Rush Adventure
-			{
-				CACHE_READ_SIZE = _1MB_READ_SIZE;
-				only_cacheSlots = only_1MB_CACHE_SLOTS;
-			} else if((ROM_TID & 0x00FFFFFF) == 0x414441	// PKMN Diamond
-					|| (ROM_TID & 0x00FFFFFF) == 0x415041	// PKMN Pearl
-					|| (ROM_TID & 0x00FFFFFF) == 0x555043	// PKMN Platinum
-					|| (ROM_TID & 0x00FFFFFF) == 0x4B5049	// PKMN HG
-					|| (ROM_TID & 0x00FFFFFF) == 0x475049	// PKMN SS
-					|| (ROM_TID & 0x00FFFFFF) == 0x4D5241	// Mario & Luigi: Partners in Time
-					|| (ROM_TID & 0x00FFFFFF) == 0x575941)	// Yoshi's Island DS
-			{
-				CACHE_READ_SIZE = _256KB_READ_SIZE;
-				only_cacheSlots = only_256KB_CACHE_SLOTS;
-			} else if((ROM_TID & 0x00FFFFFF) == 0x4B4C41)	// Lunar Knights
-			{
-				CACHE_READ_SIZE = _192KB_READ_SIZE;
-				only_cacheSlots = only_192KB_CACHE_SLOTS;
-			} else if((ROM_TID & 0x00FFFFFF) == 0x4D5341)	// Super Mario 64 DS
-			{
-				CACHE_READ_SIZE = _128KB_READ_SIZE;
-				only_cacheSlots = only_128KB_CACHE_SLOTS;
-			} else {
-				dynamicCaching = true;
-			}
+			dynamicCaching = true;
 			cacheSizeSet = true;
 		}
 		if(dynamicCaching) {
@@ -505,7 +423,7 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 	} else {
 		// read via the main RAM/DSi WRAM cache
 		while(len > 0) {
-			if(ROMinRAM==0) {
+			//if(ROMinRAM==0) {
 				int slot = 0;
 				vu8* buffer = 0;
 				if(dsiWramUsed) {
@@ -585,12 +503,12 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 					// copy directly
 					if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
 					copy8(buffer+(src-sector),dst,len2);
+					if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
 
 					// update cardi common
 					cardStruct[0] = src + len2;
 					cardStruct[1] = dst + len2;
 					cardStruct[2] = len - len2;
-					if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
 				} else {
 					#ifdef DEBUG
 					// send a log command for debug purpose
@@ -611,612 +529,22 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 					// read via the 512b ram cache
 					if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
 					copy8(buffer+(page-sector)+(src%512), dst, len2);
+					if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
 					cardStruct[0] = src + len2;
                                         cardStruct[1] = dst + len2;
                                         cardStruct[2] = len - len2;
-					if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
 					//(*readCachedRef)(cacheStruct);
 				}
-				REG_SCFG_EXT = 0x83008000;
 				len = cardStruct[2];
 				if(len>0) {
 					src = cardStruct[0];
 					dst = cardStruct[1];
-					REG_SCFG_EXT = 0x83000000;
 					page = (src/512)*512;
 					sector = (src/CACHE_READ_SIZE)*CACHE_READ_SIZE;
 					if(dsiWramUsed) WRAM_accessCounter++;
 					else accessCounterIncrease();
 				}
-			} else if (ROMinRAM==1) {
-				// Prevent overwriting ROM in RAM
-				if(dst > 0x02400000 && dst < 0x02800000) {
-					if(use12MB==2) {
-						return 0;	// Reject data from being loaded into debug 4MB area
-					} else if(use12MB==1) {
-						dst -= 0x00400000;
-					}
-				}
-
-				u32 len2=len;
-				if(len2 > 512) {
-					len2 -= src%4;
-					len2 -= len2 % 32;
-				}
-
-				if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-					#ifdef DEBUG
-					// send a log command for debug purpose
-					// -------------------------------------
-					commandRead = 0x026ff800;
-
-					sharedAddr[0] = dst;
-					sharedAddr[1] = len2;
-					sharedAddr[2] = ROM_LOCATION+src;
-					sharedAddr[3] = commandRead;
-
-					IPC_SendSync(0xEE24);
-
-					while(sharedAddr[3] != (vu32)0);
-					// -------------------------------------*/
-					#endif
-
-					// copy directly
-					REG_SCFG_EXT = 0x83008000;
-					fastCopy32(ROM_LOCATION+src,dst,len2);
-					REG_SCFG_EXT = 0x83000000;
-
-					// update cardi common
-					cardStruct[0] = src + len2;
-					cardStruct[1] = dst + len2;
-					cardStruct[2] = len - len2;
-				} else {
-					#ifdef DEBUG
-					// send a log command for debug purpose
-					// -------------------------------------
-					commandRead = 0x026ff800;
-
-					sharedAddr[0] = page;
-					sharedAddr[1] = len2;
-					sharedAddr[2] = ROM_LOCATION+page;
-					sharedAddr[3] = commandRead;
-
-					IPC_SendSync(0xEE24);
-
-					while(sharedAddr[3] != (vu32)0);
-					// -------------------------------------
-					#endif
-
-					// read via the 512b ram cache
-					if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-                                        copy8(ROM_LOCATION+page, dst, len);
-                                        if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-                                        cardStruct[0] = src + len2;
-                                        cardStruct[1] = dst + len2;
-                                        cardStruct[2] = len - len2;
-				}
-				REG_SCFG_EXT = 0x83008000;
-				len = cardStruct[2];
-				if(len>0) {
-					src = cardStruct[0];
-					dst = cardStruct[1];
-					REG_SCFG_EXT = 0x83008000;
-					page = (src/512)*512;
-				}
-			} else if (ROMinRAM==2) {
-				if(dst > 0x02400000 && dst < 0x02800000) {
-					if(use12MB==2) {
-						return 0;	// Reject data from being loaded into debug 4MB area
-					} else if(use12MB==1) {
-						dst -= 0x00400000;
-					}
-				}
-
-				if(whitelist && src >= setDataBWlist[0] && src < setDataBWlist[1]) {
-					// if(src >= setDataBWlist[0] && src < setDataBWlist[1]) {
-						u32 src2=src;
-						src2 -= setDataBWlist[0];
-						u32 page2=page;
-						page2 -= setDataBWlist[0];
-
-						u32 len2=len;
-						if(len2 > 512) {
-							len2 -= src%4;
-							len2 -= len2 % 32;
-						}
-
-						if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-							#ifdef DEBUG
-							// send a log command for debug purpose
-							// -------------------------------------
-							commandRead = 0x026ff800;
-
-							sharedAddr[0] = dst;
-							sharedAddr[1] = len2;
-							sharedAddr[2] = ROM_LOCATION+src2;
-							sharedAddr[3] = commandRead;
-
-							IPC_SendSync(0xEE24);
-
-							while(sharedAddr[3] != (vu32)0);
-							// -------------------------------------
-							#endif
-
-							// read ROM loaded into RAM
-							REG_SCFG_EXT = 0x83008000;
-							fastCopy32(ROM_LOCATION+src2,dst,len2);
-							//REG_SCFG_EXT = 0x83000000;
-
-							// update cardi common
-							cardStruct[0] = src + len2;
-							cardStruct[1] = dst + len2;
-							cardStruct[2] = len - len2;
-						} else {
-							#ifdef DEBUG
-							// send a log command for debug purpose
-							// -------------------------------------
-							commandRead = 0x026ff800;
-
-							sharedAddr[0] = page;
-							sharedAddr[1] = len2;
-							sharedAddr[2] = ROM_LOCATION+page2;
-							sharedAddr[3] = commandRead;
-
-							IPC_SendSync(0xEE24);
-
-							while(sharedAddr[3] != (vu32)0);
-							// -------------------------------------
-							#endif
-
-							// read via the 512b ram cache
-							if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-		                                        copy8(ROM_LOCATION+page2, dst, len);
-                                		        cardStruct[0] = src + len2;
-                                		        cardStruct[1] = dst + len2;
-		                                        cardStruct[2] = len - len2;
-                		                        if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-							//(*readCachedRef)(cacheStruct);
-						}
-						REG_SCFG_EXT = 0x83008000;
-						len = cardStruct[2];
-						if(len>0) {
-							src = cardStruct[0];
-							dst = cardStruct[1];
-							REG_SCFG_EXT = 0x83000000;
-							page = (src/512)*512;
-						}
-					// }
-					/* if(dataAmount >= 1 && src >= setDataBWlist_1[0] && src < setDataBWlist_1[1]) {
-						u32 src2=src;
-						src2 -= setDataBWlist_1[0];
-						src2 += setDataBWlist[2];
-						u32 page2=page;
-						page2 -= setDataBWlist_1[0];
-						page2 += setDataBWlist[2];
-
-						u32 len2=len;
-						if(len2 > 512) {
-							len2 -= src%4;
-							len2 -= len2 % 32;
-						}
-
-						if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-							#ifdef DEBUG
-							// send a log command for debug purpose
-							// -------------------------------------
-							commandRead = 0x026ff800;
-
-							sharedAddr[0] = dst;
-							sharedAddr[1] = len2;
-							sharedAddr[2] = ROM_LOCATION+src2;
-							sharedAddr[3] = commandRead;
-
-							IPC_SendSync(0xEE24);
-
-							while(sharedAddr[3] != (vu32)0);
-							// -------------------------------------
-							#endif
-
-							// read ROM loaded into RAM
-							REG_SCFG_EXT = 0x83008000;
-							fastCopy32(ROM_LOCATION+src2,dst,len2);
-							REG_SCFG_EXT = 0x83000000;
-
-							// update cardi common
-							cardStruct[0] = src + len2;
-							cardStruct[1] = dst + len2;
-							cardStruct[2] = len - len2;
-						} else {
-							#ifdef DEBUG
-							// send a log command for debug purpose
-							// -------------------------------------
-							commandRead = 0x026ff800;
-
-							sharedAddr[0] = page;
-							sharedAddr[1] = len2;
-							sharedAddr[2] = ROM_LOCATION+page2;
-							sharedAddr[3] = commandRead;
-
-							IPC_SendSync(0xEE24);
-
-							while(sharedAddr[3] != (vu32)0);
-							// -------------------------------------
-							#endif
-
-							// read via the 512b ram cache
-							REG_SCFG_EXT = 0x83008000;
-							fastCopy32(ROM_LOCATION+page2, cacheBuffer, 512);
-							REG_SCFG_EXT = 0x83000000;
-							*cachePage = page;
-							(*readCachedRef)(cacheStruct);
-						}
-						len = cardStruct[2];
-						if(len>0) {
-							src = cardStruct[0];
-							dst = cardStruct[1];
-							page = (src/512)*512;
-						}
-					}
-					if(dataAmount == 2 && src >= setDataBWlist_2[0] && src < setDataBWlist_2[1]) {
-						u32 src2=src;
-						src2 -= setDataBWlist_2[0];
-						src2 += setDataBWlist[2];
-						src2 += setDataBWlist_1[2];
-						u32 page2=page;
-						page2 -= setDataBWlist_2[0];
-						page2 += setDataBWlist[2];
-						page2 += setDataBWlist_1[2];
-
-						u32 len2=len;
-						if(len2 > 512) {
-							len2 -= src%4;
-							len2 -= len2 % 32;
-						}
-
-						if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-							#ifdef DEBUG
-							// send a log command for debug purpose
-							// -------------------------------------
-							commandRead = 0x026ff800;
-
-							sharedAddr[0] = dst;
-							sharedAddr[1] = len2;
-							sharedAddr[2] = ROM_LOCATION+src2;
-							sharedAddr[3] = commandRead;
-
-							IPC_SendSync(0xEE24);
-
-							while(sharedAddr[3] != (vu32)0);
-							// -------------------------------------
-							#endif
-
-							// read ROM loaded into RAM
-							REG_SCFG_EXT = 0x83008000;
-							fastCopy32(ROM_LOCATION+src2,dst,len2);
-							REG_SCFG_EXT = 0x83000000;
-
-							// update cardi common
-							cardStruct[0] = src + len2;
-							cardStruct[1] = dst + len2;
-							cardStruct[2] = len - len2;
-						} else {
-							#ifdef DEBUG
-							// send a log command for debug purpose
-							// -------------------------------------
-							commandRead = 0x026ff800;
-
-							sharedAddr[0] = page;
-							sharedAddr[1] = len2;
-							sharedAddr[2] = ROM_LOCATION+page2;
-							sharedAddr[3] = commandRead;
-
-							IPC_SendSync(0xEE24);
-
-							while(sharedAddr[3] != (vu32)0);
-							// -------------------------------------
-							#endif
-
-							// read via the 512b ram cache
-							REG_SCFG_EXT = 0x83008000;
-							fastCopy32(ROM_LOCATION+page2, cacheBuffer, 512);
-							REG_SCFG_EXT = 0x83000000;
-							*cachePage = page;
-							(*readCachedRef)(cacheStruct);
-						}
-						len = cardStruct[2];
-						if(len>0) {
-							src = cardStruct[0];
-							dst = cardStruct[1];
-							page = (src/512)*512;
-						}
-					} */
-				} else if(!whitelist && src > 0 && src < setDataBWlist[0]) {
-					u32 len2=len;
-					if(len2 > 512) {
-						len2 -= src%4;
-						len2 -= len2 % 32;
-					}
-
-					if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-						#ifdef DEBUG
-						// send a log command for debug purpose
-						// -------------------------------------
-						commandRead = 0x026ff800;
-
-						sharedAddr[0] = dst;
-						sharedAddr[1] = len2;
-						sharedAddr[2] = ROM_LOCATION+src;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-						// -------------------------------------*/
-						#endif
-
-						// read ROM loaded into RAM
-						REG_SCFG_EXT = 0x83008000;
-						fastCopy32(ROM_LOCATION+src,dst,len2);
-						//REG_SCFG_EXT = 0x83000000;
-
-						// update cardi common
-						cardStruct[0] = src + len2;
-						cardStruct[1] = dst + len2;
-						cardStruct[2] = len - len2;
-					} else {
-						#ifdef DEBUG
-						// send a log command for debug purpose
-						// -------------------------------------
-						commandRead = 0x026ff800;
-
-						sharedAddr[0] = page;
-						sharedAddr[1] = len2;
-						sharedAddr[2] = ROM_LOCATION+page;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-						// -------------------------------------
-						#endif
-
-						// read via the 512b ram cache
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-                        	                copy8(ROM_LOCATION+page, dst, len);
-        	                                cardStruct[0] = src + len2;
-	                                        cardStruct[1] = dst + len2;
-                                	        cardStruct[2] = len - len2;
-                	                        if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-						//(*readCachedRef)(cacheStruct);
-					}
-					REG_SCFG_EXT = 0x83008000;
-					len = cardStruct[2];
-					if(len>0) {
-						src = cardStruct[0];
-						dst = cardStruct[1];
-						REG_SCFG_EXT = 0x83000000;
-						page = (src/512)*512;
-					}
-					sharedAddr[3] = 0;
-				} else if(!whitelist && src >= setDataBWlist[1] && src < romSize) {
-					u32 len2=len;
-					if(len2 > 512) {
-						len2 -= src%4;
-						len2 -= len2 % 32;
-					}
-
-					if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-						#ifdef DEBUG
-						// send a log command for debug purpose
-						// -------------------------------------
-						commandRead = 0x026ff800;
-
-						sharedAddr[0] = dst;
-						sharedAddr[1] = len2;
-						sharedAddr[2] = ROM_LOCATION-setDataBWlist[2]+src;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-						// -------------------------------------*/
-						#endif
-
-						// read ROM loaded into RAM
-						REG_SCFG_EXT = 0x83008000;
-						fastCopy32(ROM_LOCATION-setDataBWlist[2]+src,dst,len2);
-						//REG_SCFG_EXT = 0x83000000;
-
-						// update cardi common
-						cardStruct[0] = src + len2;
-						cardStruct[1] = dst + len2;
-						cardStruct[2] = len - len2;
-					} else {
-						#ifdef DEBUG
-						// send a log command for debug purpose
-						// -------------------------------------
-						commandRead = 0x026ff800;
-
-						sharedAddr[0] = page;
-						sharedAddr[1] = len2;
-						sharedAddr[2] = ROM_LOCATION-setDataBWlist[2]+page;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-						// -------------------------------------
-						#endif
-
-						// read via the 512b ram cache
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-        	                                copy8(ROM_LOCATION-setDataBWlist[2]+page, dst, len);
-                	                        cardStruct[0] = src + len2;
-                        	                cardStruct[1] = dst + len2;
-                                	        cardStruct[2] = len - len2;
-	                                        if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-						//(*readCachedRef)(cacheStruct);
-					}
-					REG_SCFG_EXT = 0x83008000;
-					len = cardStruct[2];
-					if(len>0) {
-						src = cardStruct[0];
-						dst = cardStruct[1];
-						REG_SCFG_EXT = 0x83000000;
-						page = (src/512)*512;
-					}
-					sharedAddr[3] = 0;
-				} else if(page == src && len > GAME_READ_SIZE && dst < 0x02700000 && dst > 0x02000000 && ((u32)dst)%4==0) {
-					if(dsiWramUsed) WRAM_accessCounter++;
-					else only_accessCounter++;
-
-					// read directly at arm7 level
-					commandRead = 0x025FFB08;
-
-					cacheFlush();
-
-					sharedAddr[0] = dst;
-					sharedAddr[1] = len;
-					sharedAddr[2] = src;
-					sharedAddr[3] = commandRead;
-
-					IPC_SendSync(0xEE24);
-
-					while(sharedAddr[3] != (vu32)0);
-				} else {
-					if(dsiWramUsed) WRAM_accessCounter++;
-					else only_accessCounter++;
-
-					u32 sector = (src/GAME_READ_SIZE)*GAME_READ_SIZE;
-
-					int slot = 0;
-					vu8* buffer = 0;
-					if(dsiWramUsed) {
-						slot = WRAM_getSlotForSector(sector);
-						buffer = WRAM_getCacheAddress(slot);
-					} else {
-						slot = GAME_getSlotForSector(sector);
-						buffer = GAME_getCacheAddress(slot);
-					}
-					// read max CACHE_READ_SIZE via the main RAM cache
-					if(slot==-1) {
-						// send a command to the arm7 to fill the RAM cache
-						commandRead = 0x025FFB08;
-
-						if(dsiWramUsed) {
-							slot = WRAM_allocateCacheSlot();
-							
-							buffer = WRAM_getCacheAddress(slot);
-						} else {
-							slot = GAME_allocateCacheSlot();
-							
-							buffer = GAME_getCacheAddress(slot);
-						}
-
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-
-						if(needFlushDCCache) DC_FlushRange(buffer, GAME_READ_SIZE);
-
-						// transfer the WRAM-B cache to the arm7
-						if(dsiWramUsed) transfertToArm7(slot);				
-
-						// write the command
-						sharedAddr[0] = buffer;
-						sharedAddr[1] = GAME_READ_SIZE;
-						sharedAddr[2] = sector;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-
-						// transfer back the WRAM-B cache to the arm9
-						if(dsiWramUsed) transfertToArm9(slot);
-
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-					}
-
-					if(dsiWramUsed) {
-						WRAM_updateDescriptor(slot, sector);
-					} else {
-						updateDescriptor(slot, sector);
-					}
-
-					u32 len2=len;
-					if((src - sector) + len2 > GAME_READ_SIZE){
-						len2 = sector - src + GAME_READ_SIZE;
-					}
-
-					if(len2 > 512) {
-						len2 -= src%4;
-						len2 -= len2 % 32;
-					}
-
-					if(len2 >= 512 && len2 % 32 == 0 && ((u32)dst)%4 == 0 && src%4 == 0) {
-						#ifdef DEBUG
-						// send a log command for debug purpose
-						// -------------------------------------
-						commandRead = 0x026ff800;
-
-						sharedAddr[0] = dst;
-						sharedAddr[1] = len2;
-						sharedAddr[2] = buffer+src-sector;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-						// -------------------------------------*/
-						#endif
-
-						// copy directly
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-						fastCopy32(buffer+(src-sector),dst,len2);
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-
-						// update cardi common
-						cardStruct[0] = src + len2;
-						cardStruct[1] = dst + len2;
-						cardStruct[2] = len - len2;
-					} else {
-						#ifdef DEBUG
-						// send a log command for debug purpose
-						// -------------------------------------
-						commandRead = 0x026ff800;
-
-						sharedAddr[0] = page;
-						sharedAddr[1] = len2;
-						sharedAddr[2] = buffer+page-sector;
-						sharedAddr[3] = commandRead;
-
-						IPC_SendSync(0xEE24);
-
-						while(sharedAddr[3] != (vu32)0);
-						// -------------------------------------*/
-						#endif
-
-						// read via the 512b ram cache
-						if(!dsiWramUsed) REG_SCFG_EXT = 0x83008000;
-                                	        copy8(buffer+(page-sector), dst, len);
-        	                                cardStruct[0] = src + len2;
-	                                        cardStruct[1] = dst + len2;
-                                        	cardStruct[2] = len - len2;
-                	                        if(!dsiWramUsed) REG_SCFG_EXT = 0x83000000;
-						//(*readCachedRef)(cacheStruct);
-					}
-					REG_SCFG_EXT = 0x83008000;
-					len = cardStruct[2];
-					if(len>0) {
-						src = cardStruct[0];
-						dst = cardStruct[1];
-						REG_SCFG_EXT = 0x83000000;
-						page = (src/512)*512;
-						sector = (src/GAME_READ_SIZE)*GAME_READ_SIZE;
-						if(!dsiWramUsed) WRAM_accessCounter++;
-						else only_accessCounter++;
-					}
-				}
-			}
+			//}
 		}
 	}
 	return 0;
