@@ -52,8 +52,6 @@ Helpful information:
 #include "hook.h"
 #include "common.h"
 
-#include "databwlist.h"
-
 void arm7clearRAM();
 int sdmmc_sdcard_readsectors(u32 sector_no, u32 numsectors, void *out);
 int sdmmc_sdcard_init();
@@ -86,11 +84,6 @@ extern unsigned long donorSdkVer;
 extern unsigned long patchMpuRegion;
 extern unsigned long patchMpuSize;
 extern unsigned long loadingScreen;
-
-u32 setDataBWlist[4] = {0x00000000, 0x00000000, 0x00000000, 0x00000000};
-u32 setDataBWlist_1[3] = {0x00000000, 0x00000000, 0x00000000};
-u32 setDataBWlist_2[3] = {0x00000000, 0x00000000, 0x00000000};
-int dataAmount = 0;
 
 //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Used for debugging purposes
@@ -266,15 +259,6 @@ void loadBinary_ARM7 (aFile file)
 
 	//Fix Pokemon games needing header data.
 	fileRead ((char*)0x027FF000, file, 0, 0x170);
-
-	if((*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x414441	// Diamond
-	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x415041	// Pearl
-	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x555043	// Platinum
-	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x4B5049	// HG
-	|| (*(u32*)(0x27FF00C) & 0x00FFFFFF) == 0x475049)	// SS
-	{
-		*(u32*)(0x27FF00C) = 0x4A414441;//Make the Pokemon game code ADAJ.
-	}
 	
 	// Load binaries into memory
 	fileRead(ARM9_DST, file, ARM9_SRC, ARM9_LEN);

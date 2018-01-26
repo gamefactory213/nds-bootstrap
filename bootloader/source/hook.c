@@ -19,7 +19,6 @@
 #include "hook.h"
 #include "common.h"
 #include "cardengine_arm7_bin.h"
-#include "dldiengine_bin.h"
 #include "fat.h"
 
 extern unsigned long cheat_engine_size;
@@ -242,45 +241,6 @@ static u32* hookInterruptHandler (u32* addr, size_t size) {
 	// 2     LCD V-Counter Match
 }
 
-int hookNdsHomebrew (const tNDSHeader* ndsHeader, const u32* cheatData, u32* cheatEngineLocation, u32* dldiengineLocation, u32* wordCommandAddr) {
-	u32* hookLocation = NULL;
-	u32* hookAccel = NULL;
-
-	nocashMessage("hookNdsHomebrew");
-
-	if (!hookLocation) {
-		hookLocation = hookInterruptHandlerHomebrew((u32*)ndsHeader->arm7destination, ndsHeader->arm7binarySize);
-	}
-
-	if (!hookLocation) {
-		nocashMessage("ERR_HOOK");
-		return ERR_HOOK;
-	}
-
-	hookAccel = hookAccelIPCHomebrew2007((u32*)ndsHeader->arm7destination, ndsHeader->arm7binarySize);
-
-	if (!hookAccel) {
-		nocashMessage("ACCEL_IPC_2007_ERR");
-	} else {
-		nocashMessage("ACCEL_IPC_2007_OK");
-	}
-
-	/*hookAccel = hookAccelIPCHomebrew2010((u32*)ndsHeader->arm7destination, ndsHeader->arm7binarySize);
-
-	if (!hookAccel) {
-		nocashMessage("ACCEL_IPC_2010_ERR");
-	} else {
-		nocashMessage("ACCEL_IPC_2010_OK");
-	}*/
-
-	copyLoop (dldiengineLocation, (u32*)dldiengine_bin, dldiengine_bin_size);
-
-	dldiengineLocation[1] = myMemUncached(wordCommandAddr);
-
-	nocashMessage("ERR_NONE");
-	return ERR_NONE;
-}
-
 
 int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData, u32* cheatEngineLocation, u32* cardEngineLocation) {
 	u32* hookLocation = NULL;
@@ -295,9 +255,41 @@ int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData
 
 	if (!hookLocation) {
 		nocashMessage("ERR_HOOK");
+		//return ERR_HOOK;
+	}
+
+	if(!hookLocation){
+
+		if(*(u32*)(0x27FF03C) == 0x00022B40){
+			// TODO
+		}else if(*(u32*)(0x27FF03C) == 0x00022BCC){
+			// TODO
+		}else if(*(u32*)(0x27FF03C) == 0x00028F84){
+			hookLocation = 0x2391918;
+		}else if(*(u32*)(0x27FF03C) == 0x0002909C){
+			// TODO
+		}else if(*(u32*)(0x27FF03C) == 0x0002914C){
+			// TODO
+		}else if(*(u32*)(0x27FF03C) == 0x00029164){
+			hookLocation = 0x2391ADC;
+		}else if(*(u32*)(0x27FF03C) == 0x0002A2EC){
+			// TODO
+		}else if(*(u32*)(0x27FF03C) == 0x0002A318){
+			// TODO
+		}else if(*(u32*)(0x27FF03C) == 0x0002AF18){
+			hookLocation = 0x239227C;
+		}else if(*(u32*)(0x27FF03C) == 0x0002C5B4){
+			// TODO
+		}
+
+	}
+
+	if (!hookLocation) {
+		nocashMessage("ERR_HOOK");
 		return ERR_HOOK;
 	}
 
+	
 	u32* vblankHandler = hookLocation;
 	u32* ipcSyncHandler = hookLocation+16;
 
@@ -331,5 +323,4 @@ int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData
 	nocashMessage("ERR_NONE");
 	return ERR_NONE;
 }
-
 
