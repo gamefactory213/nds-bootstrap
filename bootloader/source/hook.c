@@ -242,7 +242,7 @@ static u32* hookInterruptHandler (u32* addr, size_t size) {
 }
 
 
-int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData, u32* cheatEngineLocation, u32* cardEngineLocation) {
+int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData, u32* cheatEngineLocation, u32* cardEngineLocation7, u32* cardEngineLocation9) {
 	u32* hookLocation = NULL;
 	u32* hookAccel = NULL;
 	u32* debug = (u32*)0x03786000;
@@ -311,11 +311,12 @@ int hookNdsRetail (const tNDSHeader* ndsHeader, aFile file, const u32* cheatData
 		nocashMessage("ACCEL_IPC_2010_OK");
 	}*/
 
-	cardEngineLocation[1] = *vblankHandler;
-	cardEngineLocation[2] = *ipcSyncHandler;
-	cardEngineLocation[4] = file.firstCluster;
+	cardEngineLocation7[1] = *vblankHandler;
+	cardEngineLocation7[2] = *ipcSyncHandler;
+	cardEngineLocation7[4] = file.firstCluster;
+	cardEngineLocation9[4] = file.firstCluster;
 
-	u32* patches =  (u32*) cardEngineLocation[0];
+	u32* patches =  (u32*) cardEngineLocation7[0];
 
 	*vblankHandler = patches[3];
 	*ipcSyncHandler = patches[4];

@@ -515,7 +515,7 @@ void arm7_main (void) {
 		errorCode = patchCardNds(NDS_HEAD,ENGINE_LOCATION_ARM7,ENGINE_LOCATION_ARM9,params,saveFileCluster, patchMpuRegion, patchMpuSize, donorFile, useArm7Donor);
 		increaseLoadBarLength();	// 6 dots
 
-		errorCode = hookNdsRetail(NDS_HEAD, file, (const u32*)CHEAT_DATA_LOCATION, (u32*)CHEAT_ENGINE_LOCATION, (u32*)ENGINE_LOCATION_ARM7);
+		errorCode = hookNdsRetail(NDS_HEAD, file, (const u32*)CHEAT_DATA_LOCATION, (u32*)CHEAT_ENGINE_LOCATION, (u32*)ENGINE_LOCATION_ARM7, (u32*)ENGINE_LOCATION_ARM9);
 		if(errorCode == ERR_NONE) {
 			nocashMessage("card hook Sucessfull");
 		} else {

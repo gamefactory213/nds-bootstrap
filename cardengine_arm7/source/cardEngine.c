@@ -147,7 +147,7 @@ void log_arm9() {
 	#endif
 }
 
-void cardRead_arm9() {
+/*void cardRead_arm9() {
 	u32 src = *(vu32*)(sharedAddr+2);
 	u32 dst = *(vu32*)(sharedAddr);
 	u32 len = *(vu32*)(sharedAddr+1);
@@ -192,7 +192,7 @@ void cardRead_delay() {
 	for(int i = 0; i < 30*60; i++) {
 		i2cWriteRegister(0x4A, 0x63, 0x00);    // Revert power LED to normal (used for delay)
 	}
-}
+}*/
 
 void runCardEngineCheck (void) {
 	//dbg_printf("runCardEngineCheck\n");
@@ -225,7 +225,7 @@ void runCardEngineCheck (void) {
 		}
 	}
 	
-	if(tryLockMutex()) {	
+	if(tryLockMutex()) {
 		initLogging();
 
 		//nocashMessage("runCardEngineCheck mutex ok");
@@ -236,7 +236,7 @@ void runCardEngineCheck (void) {
 			*(vu32*)(0x027FFB14) = 0;
 		}
 
-		if(*(vu32*)(0x027FFB14) == (vu32)0x025FFB08)
+		/*if(*(vu32*)(0x027FFB14) == (vu32)0x025FFB08)
 		{
 			cardRead_arm9();
 			*(vu32*)(0x027FFB14) = 0;
@@ -245,6 +245,28 @@ void runCardEngineCheck (void) {
 				cardRead_delay();
 				delayRan = true;
 			}
+		}*/
+
+		if(*(vu32*)(0x027FFB14) == (vu32)0x52454144)
+		{
+			u32 src = *(vu32*)(sharedAddr+2);
+			u32 dst = *(vu32*)(sharedAddr);
+			u32 len = *(vu32*)(sharedAddr+1);
+			u32 marker = *(vu32*)(sharedAddr+3);
+
+			cardReadLED(true);    // When a file is loading, turn on LED for card read indicator
+			*(vu32*)(0x027FFB14) = sdmmc_sdcard_readsectors(src, len, dst);
+			cardReadLED(false);    // After loading is done, turn off LED for card read indicator
+		}
+
+		if(*(vu32*)(0x027FFB14) == (vu32)0x57524954)
+		{
+			u32 src = *(vu32*)(sharedAddr+2);
+			u32 dst = *(vu32*)(sharedAddr);
+			u32 len = *(vu32*)(sharedAddr+1);
+			u32 marker = *(vu32*)(sharedAddr+3);
+
+			*(vu32*)(0x027FFB14) = sdmmc_sdcard_writesectors(src, len, dst);
 		}
 		unlockMutex();
 	}
