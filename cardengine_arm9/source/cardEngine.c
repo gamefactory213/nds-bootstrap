@@ -94,11 +94,11 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 	// -------------------------------------*/
 	#endif
 	
-	//REG_SCFG_EXT = 0x8300C000;
+	REG_SCFG_EXT = 0x8300C000;
 	initLogging();
 	cacheFlush();
 	fileRead(dst,romFile,src,len);
-	//REG_SCFG_EXT = 0x83008000;
+	REG_SCFG_EXT = 0x83008000;
 
 	return 0;
 }
