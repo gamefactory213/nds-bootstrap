@@ -31,7 +31,7 @@
 #define _1MB_READ_SIZE 0x100000
 
 static bool initialized = false;
-vu32* volatile cardStruct = 0x03707BC0;
+vu32* volatile cardStruct;
 //extern vu32* volatile cacheStruct;
 extern u32 fileCluster;
 extern u32 sdk_version;
@@ -52,9 +52,12 @@ void setExceptionHandler2() {
 
 void initLogging() {
 	if(!initialized) {
-		//FAT_InitFiles(false);
+		//if (sdmmc_read16(REG_SDSTATUS0) != 0) {
+			sdmmc_sdcard_init();
+		//}
+		FAT_InitFiles(false);
 		romFile = getFileFromCluster(fileCluster);
-		buildFatTableCache(romFile);
+		//buildFatTableCache(romFile);
 		initialized=true;
 	}
 	
@@ -71,12 +74,9 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 	u32 src = src0;
 	u32 len = len0;
 
-	cardStruct[0] = src;
 	if(src==0) {
 		return 0;	// If ROM read location is 0, do not proceed.
 	}
-	cardStruct[1] = dst;
-	cardStruct[2] = len;
 
 	#ifdef DEBUG
 	// send a log command for debug purpose
@@ -94,11 +94,11 @@ int cardRead (u32* cacheStruct, u8* dst0, u32 src0, u32 len0) {
 	// -------------------------------------*/
 	#endif
 	
-	REG_SCFG_EXT = 0x8300C000;
+	//REG_SCFG_EXT = 0x8300C000;
 	initLogging();
 	cacheFlush();
 	fileRead(dst,romFile,src,len);
-	REG_SCFG_EXT = 0x83008000;
+	//REG_SCFG_EXT = 0x83008000;
 
 	return 0;
 }

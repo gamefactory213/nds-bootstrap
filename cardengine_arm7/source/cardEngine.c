@@ -249,24 +249,24 @@ void runCardEngineCheck (void) {
 
 		if(*(vu32*)(0x027FFB14) == (vu32)0x52454144)
 		{
-			u32 src = *(vu32*)(sharedAddr+2);
-			u32 dst = *(vu32*)(sharedAddr);
-			u32 len = *(vu32*)(sharedAddr+1);
-			u32 marker = *(vu32*)(sharedAddr+3);
+			u32 sector_no = *(vu32*)(sharedAddr+2);
+			u32 numsectors = *(vu32*)(sharedAddr+1);
+			u32 out = *(vu32*)(sharedAddr);
+			//u32 marker = *(vu32*)(sharedAddr+3);
 
 			cardReadLED(true);    // When a file is loading, turn on LED for card read indicator
-			*(vu32*)(0x027FFB14) = sdmmc_sdcard_readsectors(src, len, dst);
+			*(vu32*)(0x027FFB14) = sdmmc_sdcard_readsectors(sector_no, numsectors, out);
 			cardReadLED(false);    // After loading is done, turn off LED for card read indicator
 		}
 
 		if(*(vu32*)(0x027FFB14) == (vu32)0x57524954)
 		{
-			u32 src = *(vu32*)(sharedAddr+2);
-			u32 dst = *(vu32*)(sharedAddr);
-			u32 len = *(vu32*)(sharedAddr+1);
-			u32 marker = *(vu32*)(sharedAddr+3);
+			u32 sector_no = *(vu32*)(sharedAddr+2);
+			u32 numsectors = *(vu32*)(sharedAddr+1);
+			u32 in = *(vu32*)(sharedAddr);
+			//u32 marker = *(vu32*)(sharedAddr+3);
 
-			*(vu32*)(0x027FFB14) = sdmmc_sdcard_writesectors(src, len, dst);
+			*(vu32*)(0x027FFB14) = sdmmc_sdcard_writesectors(sector_no, numsectors, in);
 		}
 		unlockMutex();
 	}

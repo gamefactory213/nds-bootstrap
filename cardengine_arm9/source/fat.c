@@ -195,10 +195,10 @@ enum {FS_UNKNOWN, FS_FAT12, FS_FAT16, FS_FAT32} discFileSystem;
 // Global sector buffer to save on stack space
 unsigned char globalBuffer[BYTES_PER_SECTOR];
 
-#define CLUSTER_CACHE      0xD018000 // WRAM A
+#define CLUSTER_CACHE      0xD010000 // WRAM A
 #define CLUSTER_CACHE_SIZE 0x20000 // 128K
 
-#define ONE_CACHE  0xD008000 // WRAM A
+#define ONE_CACHE  0xD000000 // WRAM A
 #define ONE_CACHE_SIZE 0x10000 // 64K
 
 static u32* lastClusterCacheUsed = (u32*) CLUSTER_CACHE;
@@ -436,10 +436,6 @@ aFile getBootFileCluster (const char* bootName)
 	// Check if fat has been initialised
 	if (discBytePerSec == 0)
 	{
-		#ifdef DEBUG
-		nocashMessage("getBootFileCluster  fat not initialised");
-		#endif
-
 		file.firstCluster = CLUSTER_FREE;
 		file.currentCluster = file.firstCluster;
 		file.currentOffset=0;
@@ -505,10 +501,6 @@ aFile getBootFileCluster (const char* bootName)
 	// If no file is found, return CLUSTER_FREE
 	if (notFound)
 	{
-		#ifdef DEBUG
-		nocashMessage("getBootFileCluster  notFound");
-		#endif
-
 		file.firstCluster = CLUSTER_FREE;
 		file.currentCluster = file.firstCluster;
 		file.currentOffset=0;
@@ -517,10 +509,6 @@ aFile getBootFileCluster (const char* bootName)
 
 		return file;
 	}
-
-	#ifdef DEBUG
-	nocashMessage("getBootFileCluster  found");
-	#endif
 
 	file.firstCluster = (dir.startCluster | (dir.startClusterHigh << 16));
 	file.currentCluster = file.firstCluster;
@@ -670,10 +658,6 @@ fileWrite(buffer, cluster, startOffset, length)
 -----------------------------------------------------------------*/
 u32 fileWrite (char* buffer, aFile file, u32 startOffset, u32 length)
 {
-	#ifdef DEBUG
-	nocashMessage("fileWrite");
-	#endif
-
 	int curByte;
 	int curSect;
 
@@ -683,9 +667,6 @@ u32 fileWrite (char* buffer, aFile file, u32 startOffset, u32 length)
 
 	if (file.firstCluster == CLUSTER_FREE || file.firstCluster == CLUSTER_EOF) 
 	{
-		#ifdef DEBUG
-		nocashMessage("CLUSTER_FREE or CLUSTER_EOF");
-		#endif
 		return 0;
 	}
 
